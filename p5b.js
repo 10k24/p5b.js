@@ -196,7 +196,7 @@ class P5b extends EventEmitter {
         }
     }
 
-     _initDOM() {
+    _initDOM() {
         // Create DOM environment
         const dom = new JSDOM('<!DOCTYPE html>');
         const window = dom.window;
