@@ -2,6 +2,15 @@
 
 Render p5.js sketches to RGBA pixel buffers in Node.js.
 
+NOTE: several features are untested or unsupported, including the following:
+- p5.js v2.x
+- webgl
+- shaders
+- images
+- video
+- sound
+- third party plugins or extensions
+
 ## Installation
 
 ```bash
