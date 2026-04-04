@@ -6,8 +6,8 @@
   "scripts": {
     "test": "bun test",
     "test:watch": "bun test --watch",
-    "lint": "bunx eslint .",
-    "lint:fix": "bunx eslint . --fix"
+    "lint": "bunx eslint",
+    "lint:fix": "bunx eslint --fix"
   },
   "license": "GPL-2.0-only",
   "type": "commonjs",

@@ -1,10 +1,10 @@
-const { EventEmitter } = require('events');
-const { JSDOM } = require('jsdom');
-const canvas = require('canvas');
-const fs = require('fs');
-const path = require('path');
-const vm = require('vm');
-const opentype = require('opentype.js');
+const { EventEmitter } = require("events");
+const { JSDOM } = require("jsdom");
+const canvas = require("canvas");
+const fs = require("fs");
+const path = require("path");
+const vm = require("vm");
+const opentype = require("opentype.js");
 
 let p5 = null;
 const noop = () => {};
@@ -35,7 +35,7 @@ class P5b extends EventEmitter {
 
     run() {
         if (this._p5Instance) {
-            throw new Error('P5b is already running. Call stop() before run().');
+            throw new Error("P5b is already running. Call stop() before run().");
         }
 
         const sketch = (pInstance) => {
@@ -58,14 +58,14 @@ class P5b extends EventEmitter {
 
     toFrame() {
         if (!this._canvas) {
-            throw new Error('Canvas not initialized. Call run() first.');
+            throw new Error("Canvas not initialized. Call run() first.");
         }
 
         const srcWidth = this._canvas.width;
         const srcHeight = this._canvas.height;
         const dstWidth = this.width;
         const dstHeight = this.height;
-        const ctx = this._canvas.getContext('2d');
+        const ctx = this._canvas.getContext("2d");
         const imageData = ctx.getImageData(0, 0, srcWidth, srcHeight);
         const srcBuffer = new Uint8Array(imageData.data);
 
@@ -103,7 +103,7 @@ class P5b extends EventEmitter {
             try {
                 global.preload();
             } catch (error) {
-                this._emitRuntimeError(error, 'preload');
+                this._emitRuntimeError(error, "preload");
                 this.stop();
             }
         };
@@ -111,9 +111,9 @@ class P5b extends EventEmitter {
         this._p5Instance.setup = () => {
             try {
                 global.setup();
-                this._canvas = document.querySelector('canvas');
+                this._canvas = document.querySelector("canvas");
             } catch (error) {
-                this._emitRuntimeError(error, 'setup');
+                this._emitRuntimeError(error, "setup");
                 this.stop();
             }
         };
@@ -122,20 +122,27 @@ class P5b extends EventEmitter {
             try {
                 global.draw();
                 this._metrics.framesDrawn++;
-                this.emit('frame', this.toFrame());
+                this.emit("frame", this.toFrame());
             } catch (error) {
-                this._emitRuntimeError(error, 'draw');
+                this._emitRuntimeError(error, "draw");
                 this.stop();
             }
         };
     }
 
     _bindGlobals() {
-        for (const [key, value] of Object.entries(this._p5Instance)) {
-            if (typeof value === 'function') {
+        // Walk prototype chain to bind all functions and key properties
+        for (const key in this._p5Instance) {
+            const value = this._p5Instance[key];
+            if (typeof value === "function") {
                 global[key] = value.bind(this._p5Instance);
-            } else {
-                global[key] = value;
+            } else if (!key.startsWith("_")) {
+                // Bind non-private properties (like frameCount, width, height)
+                Object.defineProperty(global, key, {
+                    get: () => this._p5Instance[key],
+                    set: (val) => { this._p5Instance[key] = val; },
+                    configurable: true
+                });
             }
         }
 
@@ -159,29 +166,29 @@ class P5b extends EventEmitter {
 
     _emitRuntimeError(error, phase) {
         this._metrics.errors++;
-        if (this.listenerCount('error') > 0) {
-            this.emit('error', { phase, error });
+        if (this.listenerCount("error") > 0) {
+            this.emit("error", { phase, error });
         }
     }
 
     _validateConfig() {
         if (!Number.isFinite(this.fps) || this.fps <= 0) {
-            throw new Error('Invalid config: fps must be a positive number.');
+            throw new Error("Invalid config: fps must be a positive number.");
         }
         if (!Number.isInteger(this.width) || this.width <= 0) {
-            throw new Error('Invalid config: width must be a positive integer.');
+            throw new Error("Invalid config: width must be a positive integer.");
         }
         if (!Number.isInteger(this.height) || this.height <= 0) {
-            throw new Error('Invalid config: height must be a positive integer.');
+            throw new Error("Invalid config: height must be a positive integer.");
         }
-        if (this.preload && typeof this.preload !== 'function') {
-            throw new Error('Invalid config: preload must be a function.');
+        if (this.preload && typeof this.preload !== "function") {
+            throw new Error("Invalid config: preload must be a function.");
         }
-        if (this.setup && typeof this.setup !== 'function') {
-            throw new Error('Invalid config: setup must be a function.');
+        if (this.setup && typeof this.setup !== "function") {
+            throw new Error("Invalid config: setup must be a function.");
         }
-        if (this.draw && typeof this.draw !== 'function') {
-            throw new Error('Invalid config: draw must be a function.');
+        if (this.draw && typeof this.draw !== "function") {
+            throw new Error("Invalid config: draw must be a function.");
         }
 
         global.preload = this.preload;
@@ -191,22 +198,25 @@ class P5b extends EventEmitter {
         // Execute sketch if provided (overwrites globals)
         if (this.sketchPath) {
             const absoluteSketchPath = path.resolve(this.sketchPath);
-            const code = fs.readFileSync(absoluteSketchPath, 'utf8');
+            const code = fs.readFileSync(absoluteSketchPath, "utf8");
             vm.runInThisContext(code, { filename: absoluteSketchPath });
         }
     }
 
     _initDOM() {
         // Create DOM environment
-        const dom = new JSDOM('<!DOCTYPE html>');
+        const dom = new JSDOM("<!DOCTYPE html>");
         const window = dom.window;
 
         // Install DOM globals
         global.window = window;
         global.document = window.document;
-        global.document.readyState = 'complete';
         global.screen = window.screen;
-        global.navigator = window.navigator;
+        Object.defineProperty(global, "navigator", {
+            value: window.navigator,
+            writable: false,
+            configurable: false
+        });
         global.HTMLCanvasElement = window.HTMLCanvasElement;
         global.ImageData = canvas.ImageData;
 
@@ -216,9 +226,20 @@ class P5b extends EventEmitter {
         global.requestAnimationFrame = window.requestAnimationFrame.bind(window);
         global.cancelAnimationFrame = window.cancelAnimationFrame.bind(window);
 
+        // Patch dispatchEvent to handle p5's non-standard events
+        const originalDispatchEvent = window.dispatchEvent.bind(window);
+        window.dispatchEvent = function(event) {
+            // If it's a valid Event, dispatch normally
+            if (event instanceof window.Event) {
+                return originalDispatchEvent(event);
+            }
+            // Otherwise, silently ignore (p5 internal events)
+            return true;
+        };
+
         // Lazy-load p5
         if (!p5) {
-            p5 = require('p5');
+            p5 = require("p5");
         }
     }
 }
