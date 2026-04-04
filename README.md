@@ -1,4 +1,4 @@
-# p5b
+# @10k24/p5b
 
 Render p5.js sketches to RGBA pixel buffers in Node.js.
 
@@ -14,13 +14,13 @@ NOTE: several features are untested or unsupported, including the following:
 ## Installation
 
 ```bash
-npm install p5b
+npm install @10k24/p5b
 ```
 
 ## Quick Start
 
 ```javascript
-const { P5b } = require("p5b");
+const { P5b } = require("@10k24/p5b");
 
 const p5b = new P5b({
     width: 400,

@@ -1,4 +1,4 @@
-const { P5b } = require("p5b");
+const { P5b } = require("@10k24/p5b");
 
 const p5b = new P5b({
     width: 400,

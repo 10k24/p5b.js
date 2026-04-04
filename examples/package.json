@@ -1,6 +1,6 @@
 {
-  "name": "p5b-examples",
-  "version": "1.0.0",
+  "name": "@10k24/p5b-examples",
+  "version": "1.0.1",
   "description": "Examples for p5b",
   "private": true,
   "type": "commonjs",
