@@ -2,9 +2,6 @@ const js = require("@eslint/js");
 
 module.exports = [
     {
-        ignores: ["node_modules", "bun.lock", "package-lock.json", "test/fixtures/**"]
-    },
-    {
         files: ["**/*.js"],
         languageOptions: {
             ecmaVersion: "latest",
@@ -28,11 +25,25 @@ module.exports = [
             "quotes": ["error", "double"],
             "semi": ["error", "always"],
             "no-unused-vars": ["error", { argsIgnorePattern: "^_", caughtErrorsIgnorePattern: "^_" }],
-            "no-console": ["warn"]
+            "no-console": ["warn"],
+            "eol-last": ["error", "always"],
+            "no-multiple-empty-lines": ["error", { "max": 1, "maxEOF": 0 }]
         }
     },
     {
         files: ["test/**/*.js"],
+        languageOptions: {
+            ecmaVersion: "latest",
+            sourceType: "commonjs",
+            globals: {
+                describe: "readonly",
+                it: "readonly",
+                expect: "readonly"
+            }
+        }
+    },
+    {
+        files: ["test/**/*.mjs"],
         languageOptions: {
             ecmaVersion: "latest",
             sourceType: "module",
@@ -44,25 +55,11 @@ module.exports = [
         }
     },
     {
-        files: ["examples/**/*.js"],
+        files: ["examples/**/*.js", "templates/stubs/**/*.js", "test/fixtures/sketches/**/*.js"],
         rules: {
             "no-console": "off",
             "no-undef": "off",
             "no-unused-vars": "off"
-        }
-    },
-    {
-        files: ["templates/stubs/**/*.js"],
-        rules: {
-            "no-console": "off",
-            "no-undef": "off",
-            "no-unused-vars": "off"
-        }
-    },
-    {
-        files: ["test/fixtures/sketches/**/*.js"],
-        rules: {
-            "no-undef": "off"
         }
     }
 ];

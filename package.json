@@ -4,6 +4,12 @@
   "description": "Run p5.js sketches in Node.js and stream RGBA pixel buffers",
   "author": "10k24",
   "main": "p5b.js",
+  "exports": {
+    ".": {
+      "require": "./p5b.js",
+      "import": "./p5b.mjs"
+    }
+  },
   "scripts": {
     "test": "bun test",
     "test:watch": "bun test --watch",
