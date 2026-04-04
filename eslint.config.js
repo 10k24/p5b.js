@@ -47,7 +47,16 @@ module.exports = [
         files: ["examples/**/*.js"],
         rules: {
             "no-console": "off",
-            "no-undef": "off"
+            "no-undef": "off",
+            "no-unused-vars": "off"
+        }
+    },
+    {
+        files: ["templates/stubs/**/*.js"],
+        rules: {
+            "no-console": "off",
+            "no-undef": "off",
+            "no-unused-vars": "off"
         }
     },
     {

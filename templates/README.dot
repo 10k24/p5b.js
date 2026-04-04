@@ -11,25 +11,7 @@ npm install p5b
 ## Quick Start
 
 ```javascript
-const { P5b } = require("p5b");
-
-const p5b = new P5b({
-    width: 400,
-    height: 400,
-    fps: 60,
-    setup() {
-    // p5 setup code
-    },
-    draw() {
-    // p5 draw code
-    }
-});
-
-p5b.on("frame", (buffer) => {
-    // Process frame buffer
-});
-
-p5b.run();
+{{=it.stubs.constructor}}
 ```
 
 ## API
@@ -44,14 +26,9 @@ Creates a new P5b instance with the given options.
 
 | Key | Type | Default | Description |
 | --- | --- | --- | --- |
-| `sketchPath` | string | null | Path to sketch file, omit preload, setup, & draw parameters if using |
-| `width` | number | 32 | Canvas width in pixels |
-| `height` | number | 32 | Canvas height in pixels |
-| `fps` | number | 60 | Target frame rate |
-| `preload` | function | noop | p5.js preload() function |
-| `setup` | function | noop | p5.js setup() function |
-| `draw` | function | noop | p5.js draw() function |
-
+{{~it.defaults :item}}
+| `{{=item.key}}` | {{=item.type}} | {{=item.default}} | {{=item.description}} |
+{{~}}
 ### Methods
 
 #### `run()`
@@ -59,7 +36,7 @@ Creates a new P5b instance with the given options.
 Start sketch execution and begin rendering frames.
 
 ```javascript
-p5b.run();
+{{=it.stubs.run}}
 ```
 
 Throws if already running.
@@ -69,7 +46,7 @@ Throws if already running.
 Stop sketch execution and clean up resources.
 
 ```javascript
-p5b.stop();
+{{=it.stubs.stop}}
 ```
 
 #### `toFrame()`
@@ -77,8 +54,7 @@ p5b.stop();
 Get current canvas as a Uint8Array RGBA buffer.
 
 ```javascript
-const buffer = p5b.toFrame();
-// buffer.length === width * height * 4
+{{=it.stubs.toFrame}}
 ```
 
 Throws if canvas not initialized (call `run()` first).
@@ -88,7 +64,7 @@ Throws if canvas not initialized (call `run()` first).
 Get execution metrics.
 
 ```javascript
-const { framesDrawn, errors } = p5b.getMetrics();
+{{=it.stubs.getMetrics}}
 ```
 
 Returns: `{ framesDrawn: number, errors: number }`
@@ -100,10 +76,7 @@ Returns: `{ framesDrawn: number, errors: number }`
 Emitted after each draw cycle with the rendered frame buffer.
 
 ```javascript
-p5b.on("frame", (buffer) => {
-    // buffer is Uint8Array(width * height * 4)
-    // RGBA format: [R0, G0, B0, A0, R1, G1, B1, A1, ...]
-});
+{{=it.stubs['frame-event']}}
 ```
 
 #### `'error'` event
@@ -111,19 +84,15 @@ p5b.on("frame", (buffer) => {
 Emitted when an error occurs in preload, setup, or draw.
 
 ```javascript
-p5b.on("error", ({ phase, error }) => {
-    console.error(`Error in ${phase}:`, error);
-});
+{{=it.stubs['error-event']}}
 ```
 
 ## Examples
 
 See [examples/](examples/) for runnable examples:
-
-- [examples/ex-file-based.js](examples/ex-file-based.js) — Loading sketch from file
-- [examples/ex-inline.js](examples/ex-inline.js) — Using setup/draw callbacks
-- [examples/ex-p5b-zmq.js](examples/ex-p5b-zmq.js) — ZeroMQ frame transport
-
+{{~it.examples :example}}
+- [examples/{{=example.name}}.js](examples/{{=example.name}}.js) — {{=example.description}}
+{{~}}
 
 ## Buffer Format
 
@@ -140,14 +109,12 @@ Frames are emitted as `Uint8Array` in RGBA format with automatic scaling to matc
 Example: read pixel at (x, y):
 
 ```javascript
-const x = 10, y = 20;
-const idx = (y * width + x) * 4;
-const [r, g, b, a] = buffer.slice(idx, idx + 4);
+{{=it.stubs['read-pixel']}}
 ```
 
 ## Performance
 
-- Default: 32×32 at 60 fps
+- Default: {{=it.defaultsByKey.width.default}}×{{=it.defaultsByKey.height.default}} at {{=it.defaultsByKey.fps.default}} fps
 - Frame rendering is synchronous
 - For high-res or intensive sketches, consider:
   - Reducing `fps`
