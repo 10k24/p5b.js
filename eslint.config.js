@@ -2,7 +2,7 @@ const js = require("@eslint/js");
 
 module.exports = [
     {
-        ignores: ["node_modules", "bun.lock", "package-lock.json"]
+        ignores: ["node_modules", "bun.lock", "package-lock.json", "test/fixtures/**"]
     },
     {
         files: ["**/*.js"],
@@ -47,6 +47,12 @@ module.exports = [
         files: ["examples/**/*.js"],
         rules: {
             "no-console": "off",
+            "no-undef": "off"
+        }
+    },
+    {
+        files: ["test/fixtures/sketches/**/*.js"],
+        rules: {
             "no-undef": "off"
         }
     }

@@ -212,11 +212,12 @@ class P5b extends EventEmitter {
         global.window = window;
         global.document = window.document;
         global.screen = window.screen;
-        Object.defineProperty(global, "navigator", {
-            value: window.navigator,
-            writable: false,
-            configurable: false
-        });
+        if (!Object.getOwnPropertyDescriptor(global, "navigator")) {
+            Object.defineProperty(global, "navigator", {
+                get: () => global.window.navigator,
+                configurable: true
+            });
+        }
         global.HTMLCanvasElement = window.HTMLCanvasElement;
         global.ImageData = canvas.ImageData;
 
