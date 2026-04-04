@@ -66,5 +66,3 @@ describe("P5b Real Sketch - Shapes", () => {
         p5b.run();
     });
 });
-
-

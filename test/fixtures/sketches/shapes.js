@@ -32,4 +32,3 @@ function setup() {
 
 function draw() {
 }
-
