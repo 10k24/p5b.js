@@ -1,5 +1,5 @@
 {
-    "name": "p5b",
+    "name": "@10k24/p5b",
     "version": "1.0.0",
     "description": "Run p5.js sketches in Node.js and stream RGBA pixel buffers",
     "author": "10k24",
