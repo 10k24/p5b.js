@@ -1,0 +1,10 @@
+{
+  "name": "p5b-examples",
+  "version": "1.0.0",
+  "description": "Examples for p5b",
+  "private": true,
+  "type": "commonjs",
+  "dependencies": {
+    "zeromq": "^6.0.0"
+  }
+}

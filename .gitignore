@@ -1,3 +1,6 @@
+examples/bun.lock
+examples/node_modules
+
 # Logs
 logs
 *.log
