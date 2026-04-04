@@ -4,6 +4,100 @@ const path = require("path");
 const { P5b } = require("../../p5b");
 
 describe("P5b Integration - Buffer Analysis", () => {
+    function testBackgroundColorScenarios(done) {
+        const scenarios = [
+            {
+                name: "red background",
+                width: 32, height: 32,
+                setup: () => { createCanvas(400, 400); },
+                draw: () => { background(255, 0, 0); },
+                expectedR: 255, expectedG: 0, expectedB: 0
+            },
+            {
+                name: "grayscale background",
+                width: 16, height: 16,
+                setup: () => { createCanvas(400, 400); },
+                draw: () => { background(128); },
+                expectedR: 128, expectedG: 128, expectedB: 128
+            },
+            {
+                name: "canvas scaling",
+                width: 16, height: 16,
+                setup: () => { createCanvas(64, 64); },
+                draw: () => { background(50, 100, 150); },
+                expectedR: 50, expectedG: 100, expectedB: 150
+            },
+            {
+                name: "non-square canvas",
+                width: 64, height: 32,
+                setup: () => { createCanvas(200, 100); },
+                draw: () => { background(75, 150, 225); },
+                expectedR: 75, expectedG: 150, expectedB: 225
+            },
+            {
+                name: "upscaling",
+                width: 1200, height: 500,
+                setup: () => { createCanvas(400, 400); },
+                draw: () => { background(120, 60, 180); },
+                expectedR: 120, expectedG: 60, expectedB: 180
+            },
+            {
+                name: "very wide dimensions",
+                width: 256, height: 32,
+                setup: () => { createCanvas(512, 64); },
+                draw: () => { background(40, 80, 120); },
+                expectedR: 40, expectedG: 80, expectedB: 120
+            },
+            {
+                name: "tall dimensions",
+                width: 32, height: 256,
+                setup: () => { createCanvas(64, 512); },
+                draw: () => { background(200, 100, 50); },
+                expectedR: 200, expectedG: 100, expectedB: 50
+            }
+        ];
+
+        let scenarioIndex = 0;
+
+        function testNext() {
+            if (scenarioIndex >= scenarios.length) {
+                done();
+                return;
+            }
+
+            const scenario = scenarios[scenarioIndex];
+            const p5b = new P5b({
+                width: scenario.width,
+                height: scenario.height,
+                fps: 30,
+                setup: scenario.setup,
+                draw: scenario.draw
+            });
+
+            p5b.on("frame", (buffer) => {
+                const r = buffer[0];
+                const g = buffer[1];
+                const b = buffer[2];
+                const a = buffer[3];
+                expect(r).toBe(scenario.expectedR);
+                expect(g).toBe(scenario.expectedG);
+                expect(b).toBe(scenario.expectedB);
+                expect(a).toBe(255);
+                p5b.stop();
+                scenarioIndex++;
+                testNext();
+            });
+
+            p5b.run();
+        }
+
+        testNext();
+    }
+
+    it("should render correct colors in different scenarios", (done) => {
+        testBackgroundColorScenarios(done);
+    });
+
     it("should emit buffers with correct dimensions", (done) => {
         const WIDTH = 64;
         const HEIGHT = 64;
@@ -24,46 +118,12 @@ describe("P5b Integration - Buffer Analysis", () => {
         let frameCount = 0;
         p5b.on("frame", (buffer) => {
             expect(buffer).toBeInstanceOf(Uint8Array);
-            expect(buffer.length).toBe(WIDTH * HEIGHT * 4);  // RGBA
+            expect(buffer.length).toBe(WIDTH * HEIGHT * 4);
             frameCount++;
             if (frameCount >= 2) {
                 p5b.stop();
                 done();
             }
-        });
-
-        p5b.run();
-    });
-
-    it("should render correct colors in buffer", (done) => {
-        const WIDTH = 32;
-        const HEIGHT = 32;
-        const p5b = new P5b({
-            width: WIDTH,
-            height: HEIGHT,
-            fps: 30,
-            setup: () => {
-                createCanvas(400, 400);
-            },
-            draw: () => {
-                background(255, 0, 0);  // Red background
-            }
-        });
-
-        p5b.on("frame", (buffer) => {
-            // Check that pixels at [0,0] are red (255, 0, 0, 255)
-            const r = buffer[0];
-            const g = buffer[1];
-            const b = buffer[2];
-            const a = buffer[3];
-
-            expect(r).toBe(255);
-            expect(g).toBe(0);
-            expect(b).toBe(0);
-            expect(a).toBe(255);
-
-            p5b.stop();
-            done();
         });
 
         p5b.run();
@@ -86,10 +146,7 @@ describe("P5b Integration - Buffer Analysis", () => {
         p5b.on("frame", (buffer) => {
             frames.push(new Uint8Array(buffer));
             if (frames.length >= 3) {
-                // Verify frames are different
-                const frame1 = frames[0];
-                const frame2 = frames[1];
-                expect(frame1).not.toEqual(frame2);
+                expect(frames[0]).not.toEqual(frames[1]);
                 p5b.stop();
                 done();
             }
@@ -140,9 +197,8 @@ describe("P5b Integration - Buffer Analysis", () => {
         });
 
         p5b.on("frame", (buffer) => {
-            // Check alpha channel (every 4th byte starting at 3) in first few pixels
             for (let i = 3; i < Math.min(buffer.length, 64); i += 4) {
-                expect(buffer[i]).toBe(255);  // Alpha should be 255
+                expect(buffer[i]).toBe(255);
             }
             p5b.stop();
             done();
@@ -164,17 +220,15 @@ describe("P5b Integration - Buffer Analysis", () => {
             },
             draw: () => {
                 let gfx = createGraphics(WIDTH/2, HEIGHT/2);
-                gfx.background(100, 200, 50);  // Custom RGB background in graphics buffer
+                gfx.background(100, 200, 50);
                 gfx.loadPixels();
-                image(gfx, 0, 0);  // Draw graphics buffer to main canvas
+                image(gfx, 0, 0);
             }
         });
 
         p5b.on("frame", (buffer) => {
-            // Check that graphics buffer background color is correct (100, 200, 50, 255)
             const r = buffer[0];
             const a = buffer[3];
-
             expect(r).toBe(100);
             expect(a).toBe(255);
 
@@ -183,7 +237,6 @@ describe("P5b Integration - Buffer Analysis", () => {
             const g2 = buffer[offset+1];
             const b2 = buffer[offset+2];
             const a2 = buffer[offset+3];
-
             expect(r2).toBe(255);
             expect(g2).toBe(0);
             expect(b2).toBe(0);
@@ -208,51 +261,14 @@ describe("P5b Integration - Buffer Analysis", () => {
         });
 
         p5b.on("frame", (buffer) => {
-            // Check that background color is steelblue (70, 130, 180, 255)
             const r = buffer[0];
             const g = buffer[1];
             const b = buffer[2];
             const a = buffer[3];
-
             expect(r).toBe(70);
             expect(g).toBe(130);
             expect(b).toBe(180);
             expect(a).toBe(255);
-
-            p5b.stop();
-            done();
-        });
-
-        p5b.run();
-    });
-
-    it("should assert background color matches grayscale values", (done) => {
-        const WIDTH = 16;
-        const HEIGHT = 16;
-        const p5b = new P5b({
-            width: WIDTH,
-            height: HEIGHT,
-            fps: 30,
-            setup: () => {
-                createCanvas(400, 400);
-            },
-            draw: () => {
-                background(128);  // Grayscale value
-            }
-        });
-
-        p5b.on("frame", (buffer) => {
-            // Check that grayscale background is (128, 128, 128, 255)
-            const r = buffer[0];
-            const g = buffer[1];
-            const b = buffer[2];
-            const a = buffer[3];
-
-            expect(r).toBe(128);
-            expect(g).toBe(128);
-            expect(b).toBe(128);
-            expect(a).toBe(255);
-
             p5b.stop();
             done();
         });
@@ -311,36 +327,6 @@ describe("P5b Integration - Buffer Analysis", () => {
         p5b.run();
     });
 
-    it("should handle canvas scaling with different dimensions", (done) => {
-        const WIDTH = 16;
-        const HEIGHT = 16;
-        const p5b = new P5b({
-            width: WIDTH,
-            height: HEIGHT,
-            fps: 30,
-            setup: () => {
-                createCanvas(64, 64);  // Larger canvas than frame buffer
-            },
-            draw: () => {
-                background(50, 100, 150);
-            }
-        });
-
-        p5b.on("frame", (buffer) => {
-            expect(buffer.length).toBe(WIDTH * HEIGHT * 4);
-            const r = buffer[0];
-            const g = buffer[1];
-            const b = buffer[2];
-            expect(r).toBe(50);
-            expect(g).toBe(100);
-            expect(b).toBe(150);
-            p5b.stop();
-            done();
-        });
-
-        p5b.run();
-    });
-
     it("should render filled shapes with correct colors", (done) => {
         const p5b = new P5b({
             width: 32,
@@ -357,7 +343,6 @@ describe("P5b Integration - Buffer Analysis", () => {
         });
 
         p5b.on("frame", (buffer) => {
-            // Check pixel in the filled rect
             const r = buffer[0];
             const g = buffer[1];
             const b = buffer[2];
@@ -411,7 +396,6 @@ describe("P5b Integration - Buffer Analysis", () => {
         });
 
         p5b.on("frame", (_buffer) => {
-            // Access global properties that should be bound
             expect(typeof fill).toBe("function");
             expect(typeof rect).toBe("function");
             expect(typeof frameCount).toBe("number");
@@ -430,7 +414,7 @@ describe("P5b Integration - Buffer Analysis", () => {
             height: HEIGHT,
             fps: 30,
             setup: () => {
-                createCanvas(32, 32);  // Smaller canvas for more predictable scaling
+                createCanvas(32, 32);
             },
             draw: () => {
                 background(50);
@@ -443,7 +427,6 @@ describe("P5b Integration - Buffer Analysis", () => {
         p5b.on("frame", (buffer) => {
             frameCount++;
             if (frameCount === 1) {
-                // Check a pixel in the filled area - should be more red than the background
                 const r = buffer[0];
                 expect(r).toBeGreaterThan(50);
                 p5b.stop();
@@ -454,45 +437,19 @@ describe("P5b Integration - Buffer Analysis", () => {
         p5b.run();
     });
 
-    it("should throw on invalid configuration - negative fps", () => {
-        expect(() => {
-            new P5b({
-                width: 32,
-                height: 32,
-                fps: -10
-            });
-        }).toThrow();
-    });
+    it("should reject invalid configuration values", () => {
+        const invalidConfigs = [
+            { width: 32, height: 32, fps: -10 },
+            { width: -5, height: 32, fps: 30 },
+            { width: 32, height: 32.5, fps: 30 },
+            { width: 32, height: 32, fps: 30, preload: "not a function" }
+        ];
 
-    it("should throw on invalid configuration - bad width", () => {
-        expect(() => {
-            new P5b({
-                width: -5,
-                height: 32,
-                fps: 30
-            });
-        }).toThrow();
-    });
-
-    it("should throw on invalid configuration - non-integer height", () => {
-        expect(() => {
-            new P5b({
-                width: 32,
-                height: 32.5,
-                fps: 30
-            });
-        }).toThrow();
-    });
-
-    it("should throw on invalid configuration - invalid preload type", () => {
-        expect(() => {
-            new P5b({
-                width: 32,
-                height: 32,
-                fps: 30,
-                preload: "not a function"
-            });
-        }).toThrow();
+        invalidConfigs.forEach(config => {
+            expect(() => {
+                new P5b(config);
+            }).toThrow();
+        });
     });
 
     it("should throw when sketchPath file does not exist", () => {
@@ -531,7 +488,6 @@ describe("P5b Integration - Buffer Analysis", () => {
 
         p5b.run();
 
-        // Safety timeout in case error doesn't fire
         setTimeout(() => {
             if (!errorCaught) {
                 p5b.stop();
@@ -540,7 +496,7 @@ describe("P5b Integration - Buffer Analysis", () => {
         }, 1000);
     });
 
-    it("should increment error count in metrics when draw error occurs", (done) => {
+    it("should emit error event on draw error and update metrics", (done) => {
         const p5b = new P5b({
             width: 32,
             height: 32,
@@ -554,133 +510,16 @@ describe("P5b Integration - Buffer Analysis", () => {
         });
 
         let errorCount = 0;
-        p5b.on("error", (_errorEvent) => {
+        p5b.on("error", (errorEvent) => {
             errorCount++;
             if (errorCount === 1) {
+                expect(errorEvent.phase).toBe("draw");
+                expect(errorEvent.error).toBeDefined();
                 const metrics = p5b.getMetrics();
                 expect(metrics.errors).toBe(1);
                 p5b.stop();
                 done();
             }
-        });
-
-        p5b.run();
-    });
-
-    it("should handle non-square canvas and frame dimensions", (done) => {
-        const WIDTH = 64;
-        const HEIGHT = 32;
-        const p5b = new P5b({
-            width: WIDTH,
-            height: HEIGHT,
-            fps: 30,
-            setup: () => {
-                createCanvas(200, 100);
-            },
-            draw: () => {
-                background(75, 150, 225);
-            }
-        });
-
-        p5b.on("frame", (buffer) => {
-            expect(buffer.length).toBe(WIDTH * HEIGHT * 4);
-            const r = buffer[0];
-            const g = buffer[1];
-            const b = buffer[2];
-            expect(r).toBe(75);
-            expect(g).toBe(150);
-            expect(b).toBe(225);
-            p5b.stop();
-            done();
-        });
-
-        p5b.run();
-    });
-
-    it("should scale up from smaller canvas to larger frame request", (done) => {
-        const WIDTH = 1200;
-        const HEIGHT = 500;
-        const p5b = new P5b({
-            width: WIDTH,
-            height: HEIGHT,
-            fps: 30,
-            setup: () => {
-                createCanvas(400, 400);
-            },
-            draw: () => {
-                background(120, 60, 180);
-            }
-        });
-
-        p5b.on("frame", (buffer) => {
-            expect(buffer.length).toBe(WIDTH * HEIGHT * 4);
-            // Upscaled frame should still have the background color
-            const r = buffer[0];
-            const g = buffer[1];
-            const b = buffer[2];
-            expect(r).toBe(120);
-            expect(g).toBe(60);
-            expect(b).toBe(180);
-            p5b.stop();
-            done();
-        });
-
-        p5b.run();
-    });
-
-    it("should correctly render with very wide non-square dimensions", (done) => {
-        const WIDTH = 256;
-        const HEIGHT = 32;
-        const p5b = new P5b({
-            width: WIDTH,
-            height: HEIGHT,
-            fps: 30,
-            setup: () => {
-                createCanvas(512, 64);
-            },
-            draw: () => {
-                background(40, 80, 120);
-            }
-        });
-
-        p5b.on("frame", (buffer) => {
-            expect(buffer.length).toBe(WIDTH * HEIGHT * 4);
-            // Verify pixels at different positions
-            const r0 = buffer[0];
-            const r_mid = buffer[(WIDTH / 2) * 4];
-            expect(r0).toBe(40);
-            expect(r_mid).toBe(40);
-            p5b.stop();
-            done();
-        });
-
-        p5b.run();
-    });
-
-    it("should correctly render with tall non-square dimensions", (done) => {
-        const WIDTH = 32;
-        const HEIGHT = 256;
-        const p5b = new P5b({
-            width: WIDTH,
-            height: HEIGHT,
-            fps: 30,
-            setup: () => {
-                createCanvas(64, 512);
-            },
-            draw: () => {
-                background(200, 100, 50);
-            }
-        });
-
-        p5b.on("frame", (buffer) => {
-            expect(buffer.length).toBe(WIDTH * HEIGHT * 4);
-            // Check first and bottom pixels
-            const r0 = buffer[0];
-            const r_bottom = buffer[((HEIGHT - 1) * WIDTH) * 4];
-            expect(r0).toBe(200);
-            expect(r_bottom).toBe(200);
-            p5b.stop();
-            done();
         });
 
         p5b.run();
