@@ -1,7 +1,8 @@
 {
-  "name": "p5b.js",
+  "name": "p5b",
   "version": "1.0.0",
   "description": "Run p5.js sketches in Node.js and stream RGBA pixel buffers",
+  "author": "10k24",
   "main": "p5b.js",
   "scripts": {
     "test": "bun test",
@@ -9,7 +10,10 @@
     "lint": "bunx eslint",
     "lint:fix": "bunx eslint --fix"
   },
-  "license": "GPL-2.0-only",
+  "license": "LGPL-2.1-only",
+  "engines": {
+    "node": ">=22.0.0"
+  },
   "type": "commonjs",
   "dependencies": {
     "canvas": "^3.2.3",
