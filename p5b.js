@@ -1,12 +1,11 @@
 const { EventEmitter } = require("events");
-const { JSDOM } = require("jsdom");
 const canvas = require("canvas");
 const fs = require("fs");
 const path = require("path");
 const vm = require("vm");
 const opentype = require("opentype.js");
+const { P5bDOM } = require("./p5b-dom");
 
-let p5 = null;
 const noop = () => {};
 
 const P5B_DEFAULTS = {
@@ -25,12 +24,20 @@ class P5b extends EventEmitter {
         Object.assign(this, P5B_DEFAULTS, config);
         this._p5Instance = null;
         this._canvas = null;
+        this._domBodyChildren = null;
+        this._scaleCanvas = null;
+        this._scaleCtx = null;
+        this._frameBuffer = null;
+        this._graphicsPool = new Map();
+        this._checkedOutFromPool = [];
         this._metrics = {
             framesDrawn: 0,
             errors: 0
         };
         this._validateConfig();
-        this._initDOM();
+        this._dom = new P5bDOM(this.width, this.height);
+        this._domBodyChildren = this._dom.domBodyChildren;
+        this._allCanvases = this._dom.allCanvases;
     }
 
     run() {
@@ -44,8 +51,11 @@ class P5b extends EventEmitter {
             this._initSketch();
         };
 
-        new p5(sketch);
-        this._p5Instance.frameRate(this.fps);
+        new this._dom.p5(sketch);
+        // _p5Instance may be null if setup threw synchronously and stop() was called
+        if (this._p5Instance) {
+            this._p5Instance.frameRate(this.fps);
+        }
     }
 
     stop() {
@@ -54,6 +64,16 @@ class P5b extends EventEmitter {
         }
         this._p5Instance = null;
         this._canvas = null;
+        if (this._domBodyChildren) {
+            this._domBodyChildren.length = 0;
+        }
+        if (this._allCanvases) {
+            this._allCanvases.length = 0;
+        }
+        this._scaleCanvas = null;
+        this._scaleCtx = null;
+        this._graphicsPool.clear();
+        this._checkedOutFromPool = [];
     }
 
     toFrame() {
@@ -65,33 +85,31 @@ class P5b extends EventEmitter {
         const srcHeight = this._canvas.height;
         const dstWidth = this.width;
         const dstHeight = this.height;
-        const ctx = this._canvas.getContext("2d");
-        const imageData = ctx.getImageData(0, 0, srcWidth, srcHeight);
-        const srcBuffer = new Uint8Array(imageData.data);
 
-        if (srcWidth === dstWidth && srcHeight === dstHeight) {
-            return new Uint8Array(srcBuffer);
+        // Lazy-init permanent small canvas — allocated once, reused every frame
+        if (!this._scaleCanvas) {
+            this._scaleCanvas = canvas.createCanvas(dstWidth, dstHeight);
+            this._scaleCtx = this._scaleCanvas.getContext("2d");
+            this._frameBuffer = Buffer.alloc(dstWidth * dstHeight * 4);
         }
 
-        const frame = new Uint8Array(dstWidth * dstHeight * 4);
-        const scaleX = srcWidth / dstWidth;
-        const scaleY = srcHeight / dstHeight;
+        // Cairo handles all scaling natively — same-size case is a direct blit
+        this._scaleCtx.drawImage(this._canvas, 0, 0, srcWidth, srcHeight, 0, 0, dstWidth, dstHeight);
 
-        for (let y = 0; y < dstHeight; y++) {
-            for (let x = 0; x < dstWidth; x++) {
-                const srcX = Math.min(Math.floor((x + 0.5) * scaleX), srcWidth - 1);
-                const srcY = Math.min(Math.floor((y + 0.5) * scaleY), srcHeight - 1);
-                const srcIdx = (srcY * srcWidth + srcX) * 4;
-                const dstIdx = (y * dstWidth + x) * 4;
+        // toBuffer('raw') on the tiny canvas only — always dstWidth*dstHeight*4 bytes (e.g. 4KB for 32×32)
+        // This stays in V8 young-gen and is collected by cheap minor GC, not major mark-compact
+        const rawBuf = this._scaleCanvas.toBuffer("raw");
 
-                frame[dstIdx] = srcBuffer[srcIdx];
-                frame[dstIdx + 1] = srcBuffer[srcIdx + 1];
-                frame[dstIdx + 2] = srcBuffer[srcIdx + 2];
-                frame[dstIdx + 3] = srcBuffer[srcIdx + 3];
-            }
+        // BGRA → RGBA into reusable frame buffer
+        for (let i = 0; i < rawBuf.length; i += 4) {
+            this._frameBuffer[i]     = rawBuf[i + 2]; // R ← B
+            this._frameBuffer[i + 1] = rawBuf[i + 1]; // G
+            this._frameBuffer[i + 2] = rawBuf[i];     // B ← R
+            this._frameBuffer[i + 3] = rawBuf[i + 3]; // A
         }
 
-        return frame;
+        // Copy so callers can safely hold the buffer across async ZMQ sends
+        return new Uint8Array(this._frameBuffer);
     }
 
     getMetrics() {
@@ -120,10 +138,36 @@ class P5b extends EventEmitter {
 
         this._p5Instance.draw = () => {
             try {
+                const elemsBefore = this._p5Instance._elements.length;
                 global.draw();
+
+                // Return pool-checked-out graphics objects back to the pool
+                for (const { pg, key } of this._checkedOutFromPool) {
+                    const bucket = this._graphicsPool.get(key);
+                    if (bucket) bucket.push(pg);
+                }
+                this._checkedOutFromPool = [];
+
+                // Pool any newly created graphics objects (from _elements growth).
+                // Remove their canvases from allCanvases and _domBodyChildren — they
+                // live in the pool now and don't need DOM tracking.
+                while (this._p5Instance._elements.length > elemsBefore) {
+                    const el = this._p5Instance._elements.pop();
+                    if (el && el.elt) {
+                        const ai = this._allCanvases.indexOf(el.elt);
+                        if (ai > -1) this._allCanvases.splice(ai, 1);
+                        const bi = this._domBodyChildren.indexOf(el.elt);
+                        if (bi > -1) this._domBodyChildren.splice(bi, 1);
+                        const key = `${el.elt.width}:${el.elt.height}`;
+                        if (!this._graphicsPool.has(key)) this._graphicsPool.set(key, []);
+                        this._graphicsPool.get(key).push(el);
+                    }
+                }
+
                 this._metrics.framesDrawn++;
                 this.emit("frame", this.toFrame());
             } catch (error) {
+                this._checkedOutFromPool = [];
                 this._emitRuntimeError(error, "draw");
                 this.stop();
             }
@@ -158,9 +202,25 @@ class P5b extends EventEmitter {
             const parsedFont = opentype.parse(
                 fontData.buffer.slice(fontData.byteOffset, fontData.byteOffset + fontData.byteLength)
             );
-            const p5Font = new p5.Font(this._p5Instance);
+            const p5Font = new this._dom.p5.Font(this._p5Instance);
             p5Font.font = parsedFont;
             return p5Font;
+        };
+
+        // Pool-based createGraphics: reuse Graphics objects across frames instead of
+        // allocating new Cairo surfaces every draw call. On first use a new object is
+        // created normally; on subsequent uses the pooled object is returned directly,
+        // avoiding any allocation at all.
+        const _cg = global.createGraphics;
+        global.createGraphics = (w, h, ...rest) => {
+            const key = `${w}:${h}`;
+            const bucket = this._graphicsPool.get(key);
+            if (bucket && bucket.length > 0) {
+                const pg = bucket.pop();
+                this._checkedOutFromPool.push({ pg, key });
+                return pg;
+            }
+            return _cg(w, h, ...rest);
         };
     }
 
@@ -203,46 +263,6 @@ class P5b extends EventEmitter {
         }
     }
 
-    _initDOM() {
-        // Create DOM environment
-        const dom = new JSDOM("<!DOCTYPE html>");
-        const window = dom.window;
-
-        // Install DOM globals
-        global.window = window;
-        global.document = window.document;
-        global.screen = window.screen;
-        if (!Object.getOwnPropertyDescriptor(global, "navigator")) {
-            Object.defineProperty(global, "navigator", {
-                get: () => global.window.navigator,
-                configurable: true
-            });
-        }
-        global.HTMLCanvasElement = window.HTMLCanvasElement;
-        global.ImageData = canvas.ImageData;
-
-        // Install animation frame globals
-        window.requestAnimationFrame = (callback) => setImmediate(callback);
-        window.cancelAnimationFrame = (id) => clearImmediate(id);
-        global.requestAnimationFrame = window.requestAnimationFrame.bind(window);
-        global.cancelAnimationFrame = window.cancelAnimationFrame.bind(window);
-
-        // Patch dispatchEvent to handle p5's non-standard events
-        const originalDispatchEvent = window.dispatchEvent.bind(window);
-        window.dispatchEvent = function(event) {
-            // If it's a valid Event, dispatch normally
-            if (event instanceof window.Event) {
-                return originalDispatchEvent(event);
-            }
-            // Otherwise, silently ignore (p5 internal events)
-            return true;
-        };
-
-        // Lazy-load p5
-        if (!p5) {
-            p5 = require("p5");
-        }
-    }
 }
 
 module.exports = { P5b, P5B_DEFAULTS };

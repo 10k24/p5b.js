@@ -61,8 +61,9 @@ class P5bZMQ {
     }
 
     async onFrame(pixelBuffer) {
-        if (pixelBuffer.length !== this.p.width * this.p.height * 4) {
-            const err = new Error(`Size mismatch: ${pixelBuffer.length} != ${this.p.width * this.p.height * 4}`);
+        const expectedSize = this.p.width * this.p.height * 4;
+        if (pixelBuffer.length !== expectedSize) {
+            const err = new Error(`Size mismatch: ${pixelBuffer.length} != ${expectedSize}`);
             if (!this.silent) {
                 console.error(err.message);
             }
@@ -71,7 +72,9 @@ class P5bZMQ {
 
         this.pending = true;
         try {
-            await this.sock.send(pixelBuffer);
+            // Copy buffer before async operation since toFrame() reuses the buffer
+            const bufferCopy = new Uint8Array(pixelBuffer);
+            await this.sock.send(bufferCopy);
             await this.sock.receive();
             this.metrics.framesSent++;
         } catch (err) {
