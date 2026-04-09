@@ -68,18 +68,11 @@ class P5b extends EventEmitter {
         const dstWidth = this.width;
         const dstHeight = this.height;
 
-        // Lazy-init permanent small canvas — allocated once, reused every frame
-        if (!this._scaleCanvas) {
-            this._scaleCanvas = canvas.createCanvas(dstWidth, dstHeight);
-        }
-
-        // Cairo handles all scaling natively — same-size case is a direct blit
-        const scaleCtx = this._scaleCanvas.getContext("2d");
+        const scaleCanvas = canvas.createCanvas(dstWidth, dstHeight);
+        const scaleCtx = scaleCanvas.getContext("2d");
         scaleCtx.drawImage(canvasEl, 0, 0, srcWidth, srcHeight, 0, 0, dstWidth, dstHeight);
 
-        // toBuffer('raw') on the tiny canvas only — always dstWidth*dstHeight*4 bytes (e.g. 4KB for 32×32)
-        // This stays in V8 young-gen and is collected by cheap minor GC, not major mark-compact
-        const ret = new Uint8Array(this._scaleCanvas.toBuffer("raw"));
+        const ret = new Uint8Array(scaleCanvas.toBuffer("raw"));
 
         // Swap pixel data order BGRA -> RGBA
         for (let i = 0; i < ret.length; i += 4) {
@@ -200,7 +193,15 @@ class P5b extends EventEmitter {
                     that._checkedOutFromPool.push({ pg, key });
                     return pg;
                 }
-                return cg(w, h, ...rest);
+                
+                const ret = cg(w, h, ...rest);
+                // Override .remove() on new graphics before they're used
+                ret.remove = function() {
+                    if (this.elt && this.elt.parentNode) {
+                        this.elt.parentNode.removeChild(this.elt);
+                    }
+                };
+                return ret;
             };
         })(this, global.createGraphics);
     }
