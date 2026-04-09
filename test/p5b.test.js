@@ -1,5 +1,6 @@
 const { describe, it, expect } = require("bun:test");
 const { P5b, P5B_DEFAULTS } = require("../p5b.js");
+const { P5bDOM } = require("../p5b-dom.js");
 
 describe("P5b Exports", () => {
     it("should export P5b class", () => {

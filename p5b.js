@@ -23,11 +23,7 @@ class P5b extends EventEmitter {
         super();
         Object.assign(this, P5B_DEFAULTS, config);
         this._p5Instance = null;
-        this._canvas = null;
-        this._domBodyChildren = null;
         this._scaleCanvas = null;
-        this._scaleCtx = null;
-        this._frameBuffer = null;
         this._graphicsPool = new Map();
         this._checkedOutFromPool = [];
         this._metrics = {
@@ -36,8 +32,6 @@ class P5b extends EventEmitter {
         };
         this._validateConfig();
         this._dom = new P5bDOM(this.width, this.height);
-        this._domBodyChildren = this._dom.domBodyChildren;
-        this._allCanvases = this._dom.allCanvases;
     }
 
     run() {
@@ -51,65 +45,51 @@ class P5b extends EventEmitter {
             this._initSketch();
         };
 
-        new this._dom.p5(sketch);
-        // _p5Instance may be null if setup threw synchronously and stop() was called
-        if (this._p5Instance) {
-            this._p5Instance.frameRate(this.fps);
-        }
+        new (this.getP5())(sketch);
     }
 
     stop() {
-        if (this._p5Instance) {
-            this._p5Instance.remove();
-        }
+        this._p5Instance?.remove();
         this._p5Instance = null;
-        this._canvas = null;
-        if (this._domBodyChildren) {
-            this._domBodyChildren.length = 0;
-        }
-        if (this._allCanvases) {
-            this._allCanvases.length = 0;
-        }
+        this._dom.clear();
         this._scaleCanvas = null;
-        this._scaleCtx = null;
         this._graphicsPool.clear();
         this._checkedOutFromPool = [];
     }
 
     toFrame() {
-        if (!this._canvas) {
+        const canvasEl = this._dom.getCanvas();
+        if (!canvasEl) {
             throw new Error("Canvas not initialized. Call run() first.");
         }
 
-        const srcWidth = this._canvas.width;
-        const srcHeight = this._canvas.height;
+        const srcWidth = canvasEl.width;
+        const srcHeight = canvasEl.height;
         const dstWidth = this.width;
         const dstHeight = this.height;
 
         // Lazy-init permanent small canvas — allocated once, reused every frame
         if (!this._scaleCanvas) {
             this._scaleCanvas = canvas.createCanvas(dstWidth, dstHeight);
-            this._scaleCtx = this._scaleCanvas.getContext("2d");
-            this._frameBuffer = Buffer.alloc(dstWidth * dstHeight * 4);
         }
 
         // Cairo handles all scaling natively — same-size case is a direct blit
-        this._scaleCtx.drawImage(this._canvas, 0, 0, srcWidth, srcHeight, 0, 0, dstWidth, dstHeight);
+        const scaleCtx = this._scaleCanvas.getContext("2d");
+        scaleCtx.drawImage(canvasEl, 0, 0, srcWidth, srcHeight, 0, 0, dstWidth, dstHeight);
 
         // toBuffer('raw') on the tiny canvas only — always dstWidth*dstHeight*4 bytes (e.g. 4KB for 32×32)
         // This stays in V8 young-gen and is collected by cheap minor GC, not major mark-compact
-        const rawBuf = this._scaleCanvas.toBuffer("raw");
+        const ret = new Uint8Array(this._scaleCanvas.toBuffer("raw"));
 
-        // BGRA → RGBA into reusable frame buffer
-        for (let i = 0; i < rawBuf.length; i += 4) {
-            this._frameBuffer[i]     = rawBuf[i + 2]; // R ← B
-            this._frameBuffer[i + 1] = rawBuf[i + 1]; // G
-            this._frameBuffer[i + 2] = rawBuf[i];     // B ← R
-            this._frameBuffer[i + 3] = rawBuf[i + 3]; // A
+        // Swap pixel data order BGRA -> RGBA
+        for (let i = 0; i < ret.length; i += 4) {
+            const swapRB = ret[i];
+            const swapBR = ret[i + 2];
+            ret[i] = swapBR;
+            ret[i + 2] = swapRB;
         }
 
-        // Copy so callers can safely hold the buffer across async ZMQ sends
-        return new Uint8Array(this._frameBuffer);
+        return ret;
     }
 
     getMetrics() {
@@ -117,6 +97,8 @@ class P5b extends EventEmitter {
     }
 
     _initSketch() {
+        this._p5Instance.frameRate(this.fps);
+
         this._p5Instance.preload = () => {
             try {
                 global.preload();
@@ -129,7 +111,6 @@ class P5b extends EventEmitter {
         this._p5Instance.setup = () => {
             try {
                 global.setup();
-                this._canvas = document.querySelector("canvas");
             } catch (error) {
                 this._emitRuntimeError(error, "setup");
                 this.stop();
@@ -149,15 +130,11 @@ class P5b extends EventEmitter {
                 this._checkedOutFromPool = [];
 
                 // Pool any newly created graphics objects (from _elements growth).
-                // Remove their canvases from allCanvases and _domBodyChildren — they
-                // live in the pool now and don't need DOM tracking.
+                // Remove their canvases from the DOM helper's tracking lists.
                 while (this._p5Instance._elements.length > elemsBefore) {
                     const el = this._p5Instance._elements.pop();
                     if (el && el.elt) {
-                        const ai = this._allCanvases.indexOf(el.elt);
-                        if (ai > -1) this._allCanvases.splice(ai, 1);
-                        const bi = this._domBodyChildren.indexOf(el.elt);
-                        if (bi > -1) this._domBodyChildren.splice(bi, 1);
+                        this._dom.removeTrackedCanvas(el.elt);
                         const key = `${el.elt.width}:${el.elt.height}`;
                         if (!this._graphicsPool.has(key)) this._graphicsPool.set(key, []);
                         this._graphicsPool.get(key).push(el);
@@ -190,45 +167,51 @@ class P5b extends EventEmitter {
             }
         }
 
-        global.loadFont = (fontPath) => {
-            const assetDir = this.sketchPath
-                ? path.dirname(path.resolve(this.sketchPath))
-                : process.cwd();
-            const fontData = fs.readFileSync(
-                path.isAbsolute(fontPath)
-                    ? fontPath
-                    : path.resolve(assetDir, fontPath)
-            );
-            const parsedFont = opentype.parse(
-                fontData.buffer.slice(fontData.byteOffset, fontData.byteOffset + fontData.byteLength)
-            );
-            const p5Font = new this._dom.p5.Font(this._p5Instance);
-            p5Font.font = parsedFont;
-            return p5Font;
-        };
+        global.loadFont = (function(that) {
+            const P5Constructor = that.getP5();
+            return function(fontPath) {
+                const assetDir = that.sketchPath
+                    ? path.dirname(path.resolve(that.sketchPath))
+                    : process.cwd();
+                const fontData = fs.readFileSync(
+                    path.isAbsolute(fontPath)
+                        ? fontPath
+                        : path.resolve(assetDir, fontPath)
+                );
+                const parsedFont = opentype.parse(
+                    fontData.buffer.slice(fontData.byteOffset, fontData.byteOffset + fontData.byteLength)
+                );
+                const p5Font = new P5Constructor.Font(that._p5Instance);
+                p5Font.font = parsedFont;
+                return p5Font;
+            };
+        })(this);
 
         // Pool-based createGraphics: reuse Graphics objects across frames instead of
         // allocating new Cairo surfaces every draw call. On first use a new object is
         // created normally; on subsequent uses the pooled object is returned directly,
         // avoiding any allocation at all.
-        const _cg = global.createGraphics;
-        global.createGraphics = (w, h, ...rest) => {
-            const key = `${w}:${h}`;
-            const bucket = this._graphicsPool.get(key);
-            if (bucket && bucket.length > 0) {
-                const pg = bucket.pop();
-                this._checkedOutFromPool.push({ pg, key });
-                return pg;
-            }
-            return _cg(w, h, ...rest);
-        };
+        global.createGraphics = (function(that, cg) {
+            return function(w, h, ...rest) {
+                const key = `${w}:${h}`;
+                const bucket = that._graphicsPool.get(key);
+                if (bucket && bucket.length > 0) {
+                    const pg = bucket.pop();
+                    that._checkedOutFromPool.push({ pg, key });
+                    return pg;
+                }
+                return cg(w, h, ...rest);
+            };
+        })(this, global.createGraphics);
     }
 
     _emitRuntimeError(error, phase) {
         this._metrics.errors++;
-        if (this.listenerCount("error") > 0) {
-            this.emit("error", { phase, error });
-        }
+        this.emit("error", { phase, error });
+    }
+
+    getP5() {
+        return require("p5").default || require("p5");
     }
 
     _validateConfig() {

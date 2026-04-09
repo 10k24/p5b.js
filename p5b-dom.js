@@ -4,15 +4,35 @@ class P5bDOM {
     constructor(width, height) {
         this.width = width;
         this.height = height;
-        this.domBodyChildren = [];
-        this.allCanvases = [];
-        this.p5 = null;
+        this._bodyChildren = [];
+        this._canvases = [];
         this._init();
     }
 
+    getCanvas() {
+        return global.document.querySelector("canvas");
+    }
+
+    removeTrackedCanvas(canvasEl) {
+        const canvasIndex = this._canvases.indexOf(canvasEl);
+        if (canvasIndex > -1) {
+            this._canvases.splice(canvasIndex, 1);
+        }
+
+        const bodyIndex = this._bodyChildren.indexOf(canvasEl);
+        if (bodyIndex > -1) {
+            this._bodyChildren.splice(bodyIndex, 1);
+        }
+    }
+
+    clear() {
+        this._bodyChildren.length = 0;
+        this._canvases.length = 0;
+    }
+
     _init() {
-        const bodyChildren = this.domBodyChildren;
-        const allCanvases = this.allCanvases;
+        const bodyChildren = this._bodyChildren;
+        const allCanvases = this._canvases;
 
         const makeStubElement = (tag) => {
             const el = {
@@ -122,7 +142,6 @@ class P5bDOM {
             innerWidth: this.width,
             innerHeight: this.height,
             devicePixelRatio: 1,
-            performance: { now: () => performance.now() },
             location: { search: "", pathname: "/", href: "http://localhost/", hash: "" },
             getComputedStyle: () => stubStyle,
             URL: { createObjectURL: () => "", revokeObjectURL: () => {} },
@@ -130,6 +149,7 @@ class P5bDOM {
             MouseEvent: class MouseEvent { constructor(type) { this.type = type; } },
             HTMLCanvasElement: canvas.Canvas,
             ImageData: canvas.ImageData,
+            performance: { now: () => Date.now() },
         };
 
         global.window = win;
@@ -148,7 +168,6 @@ class P5bDOM {
         global.Event = win.Event;
         global.MouseEvent = win.MouseEvent;
 
-        this.p5 = require("p5");
     }
 }
 
