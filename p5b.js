@@ -22,10 +22,10 @@ class P5b extends EventEmitter {
     constructor(config = {}) {
         super();
         Object.assign(this, P5B_DEFAULTS, config);
-        this._p5Instance = null;
-        this._scaleCanvas = null;
-        this._graphicsPool = new Map();
-        this._checkedOutFromPool = [];
+        this._myP5 = null;
+        this._destCanvas = null;
+        this._gfxPool = new Map();
+        this._gfxActive = [];
         this._metrics = {
             framesDrawn: 0,
             errors: 0
@@ -35,51 +35,48 @@ class P5b extends EventEmitter {
     }
 
     run() {
-        if (this._p5Instance) {
+        if (this._myP5) {
             throw new Error("P5b is already running. Call stop() before run().");
         }
 
         const sketch = (pInstance) => {
-            this._p5Instance = pInstance;
+            this._myP5 = pInstance;
             this._bindGlobals();
             this._initSketch();
         };
 
-        new (this.getP5())(sketch);
+        new (this._loadP5())(sketch);
     }
 
     stop() {
-        this._p5Instance?.remove();
-        this._p5Instance = null;
+        this._myP5?.remove();
+        this._myP5 = null;
+        this._destCanvas = null;
         this._dom.clear();
-        this._scaleCanvas = null;
-        this._graphicsPool.clear();
-        this._checkedOutFromPool = [];
+        this._gfxPool.clear();
+        this._gfxActive = [];
     }
 
     toFrame() {
-        const canvasEl = this._dom.getCanvas();
-        if (!canvasEl) {
+        const srcCanvas = this._dom.getCanvas();
+        if (!srcCanvas) {
             throw new Error("Canvas not initialized. Call run() first.");
         }
 
-        const srcWidth = canvasEl.width;
-        const srcHeight = canvasEl.height;
-        const dstWidth = this.width;
-        const dstHeight = this.height;
+        if (!this._destCanvas) {
+            this._destCanvas = canvas.createCanvas(this.width, this.height);
+        }
 
-        const scaleCanvas = canvas.createCanvas(dstWidth, dstHeight);
-        const scaleCtx = scaleCanvas.getContext("2d");
-        scaleCtx.drawImage(canvasEl, 0, 0, srcWidth, srcHeight, 0, 0, dstWidth, dstHeight);
+        this._destCanvas.getContext("2d").drawImage(srcCanvas, 0, 0, srcCanvas.width, srcCanvas.height, 0, 0, this.width, this.height);
 
-        const ret = new Uint8Array(scaleCanvas.toBuffer("raw"));
+        const ret = new Uint8Array(this._destCanvas.toBuffer("raw"));
 
         // Swap pixel data order BGRA -> RGBA
         for (let i = 0; i < ret.length; i += 4) {
-            const swapRB = ret[i];
-            const swapBR = ret[i + 2];
-            ret[i] = swapBR;
-            ret[i + 2] = swapRB;
+            const swapR2B = ret[i];
+            const swapB2R = ret[i + 2];
+            ret[i] = swapB2R;
+            ret[i + 2] = swapR2B;
         }
 
         return ret;
@@ -89,10 +86,14 @@ class P5b extends EventEmitter {
         return this._metrics;
     }
 
-    _initSketch() {
-        this._p5Instance.frameRate(this.fps);
+     _loadP5() {
+        return require("p5").default || require("p5");
+    }
 
-        this._p5Instance.preload = () => {
+    _initSketch() {
+        this._myP5.frameRate(this.fps);
+
+        this._myP5.preload = () => {
             try {
                 global.preload();
             } catch (error) {
@@ -101,7 +102,7 @@ class P5b extends EventEmitter {
             }
         };
 
-        this._p5Instance.setup = () => {
+        this._myP5.setup = () => {
             try {
                 global.setup();
             } catch (error) {
@@ -110,34 +111,34 @@ class P5b extends EventEmitter {
             }
         };
 
-        this._p5Instance.draw = () => {
+        this._myP5.draw = () => {
             try {
-                const elemsBefore = this._p5Instance._elements.length;
+                const elemsBefore = this._myP5._elements.length;
                 global.draw();
 
                 // Return pool-checked-out graphics objects back to the pool
-                for (const { pg, key } of this._checkedOutFromPool) {
-                    const bucket = this._graphicsPool.get(key);
+                for (const { pg, key } of this._gfxActive) {
+                    const bucket = this._gfxPool.get(key);
                     if (bucket) bucket.push(pg);
                 }
-                this._checkedOutFromPool = [];
+                this._gfxActive = [];
 
                 // Pool any newly created graphics objects (from _elements growth).
                 // Remove their canvases from the DOM helper's tracking lists.
-                while (this._p5Instance._elements.length > elemsBefore) {
-                    const el = this._p5Instance._elements.pop();
+                while (this._myP5._elements.length > elemsBefore) {
+                    const el = this._myP5._elements.pop();
                     if (el && el.elt) {
                         this._dom.removeTrackedCanvas(el.elt);
                         const key = `${el.elt.width}:${el.elt.height}`;
-                        if (!this._graphicsPool.has(key)) this._graphicsPool.set(key, []);
-                        this._graphicsPool.get(key).push(el);
+                        if (!this._gfxPool.has(key)) this._gfxPool.set(key, []);
+                        this._gfxPool.get(key).push(el);
                     }
                 }
 
                 this._metrics.framesDrawn++;
                 this.emit("frame", this.toFrame());
             } catch (error) {
-                this._checkedOutFromPool = [];
+                this._gfxActive = [];
                 this._emitRuntimeError(error, "draw");
                 this.stop();
             }
@@ -146,22 +147,22 @@ class P5b extends EventEmitter {
 
     _bindGlobals() {
         // Walk prototype chain to bind all functions and key properties
-        for (const key in this._p5Instance) {
-            const value = this._p5Instance[key];
+        for (const key in this._myP5) {
+            const value = this._myP5[key];
             if (typeof value === "function") {
-                global[key] = value.bind(this._p5Instance);
+                global[key] = value.bind(this._myP5);
             } else if (!key.startsWith("_")) {
                 // Bind non-private properties (like frameCount, width, height)
                 Object.defineProperty(global, key, {
-                    get: () => this._p5Instance[key],
-                    set: (val) => { this._p5Instance[key] = val; },
+                    get: () => this._myP5[key],
+                    set: (val) => { this._myP5[key] = val; },
                     configurable: true
                 });
             }
         }
 
         global.loadFont = (function(that) {
-            const P5Constructor = that.getP5();
+            const P5Constructor = that._loadP5();
             return function(fontPath) {
                 const assetDir = that.sketchPath
                     ? path.dirname(path.resolve(that.sketchPath))
@@ -174,7 +175,7 @@ class P5b extends EventEmitter {
                 const parsedFont = opentype.parse(
                     fontData.buffer.slice(fontData.byteOffset, fontData.byteOffset + fontData.byteLength)
                 );
-                const p5Font = new P5Constructor.Font(that._p5Instance);
+                const p5Font = new P5Constructor.Font(that._myP5);
                 p5Font.font = parsedFont;
                 return p5Font;
             };
@@ -187,10 +188,10 @@ class P5b extends EventEmitter {
         global.createGraphics = (function(that, cg) {
             return function(w, h, ...rest) {
                 const key = `${w}:${h}`;
-                const bucket = that._graphicsPool.get(key);
+                const bucket = that._gfxPool.get(key);
                 if (bucket && bucket.length > 0) {
                     const pg = bucket.pop();
-                    that._checkedOutFromPool.push({ pg, key });
+                    that._gfxActive.push({ pg, key });
                     return pg;
                 }
                 
@@ -209,11 +210,7 @@ class P5b extends EventEmitter {
     _emitRuntimeError(error, phase) {
         this._metrics.errors++;
         this.emit("error", { phase, error });
-    }
-
-    getP5() {
-        return require("p5").default || require("p5");
-    }
+    }    
 
     _validateConfig() {
         if (!Number.isFinite(this.fps) || this.fps <= 0) {
@@ -246,7 +243,6 @@ class P5b extends EventEmitter {
             vm.runInThisContext(code, { filename: absoluteSketchPath });
         }
     }
-
 }
 
 module.exports = { P5b, P5B_DEFAULTS };

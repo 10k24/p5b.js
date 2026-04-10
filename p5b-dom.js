@@ -1,5 +1,11 @@
 const canvas = require("canvas");
 
+const noop = () => {};
+const spliceFrom = (arr, item) => {
+    const idx = arr.indexOf(item);
+    idx > -1 && arr.splice(idx, 1);
+};
+
 class P5bDOM {
     constructor(width, height) {
         this.width = width;
@@ -14,15 +20,8 @@ class P5bDOM {
     }
 
     removeTrackedCanvas(canvasEl) {
-        const canvasIndex = this._canvases.indexOf(canvasEl);
-        if (canvasIndex > -1) {
-            this._canvases.splice(canvasIndex, 1);
-        }
-
-        const bodyIndex = this._bodyChildren.indexOf(canvasEl);
-        if (bodyIndex > -1) {
-            this._bodyChildren.splice(bodyIndex, 1);
-        }
+        spliceFrom(this._canvases, canvasEl);
+        spliceFrom(this._bodyChildren, canvasEl);
     }
 
     clear() {
@@ -40,17 +39,16 @@ class P5bDOM {
                 id: "",
                 style: {},
                 dataset: {},
-                classList: { add: () => {}, remove: () => {}, contains: () => false, toggle: () => {} },
-                addEventListener: () => {},
-                removeEventListener: () => {},
+                classList: { add: noop, remove: noop, contains: () => false, toggle: noop },
+                addEventListener: noop,
+                removeEventListener: noop,
                 dispatchEvent: () => true,
                 appendChild: (child) => { el.childNodes.push(child); return child; },
                 removeChild: (child) => {
-                    const i = el.childNodes.indexOf(child);
-                    if (i > -1) el.childNodes.splice(i, 1);
+                    spliceFrom(el.childNodes, child);
                     return child;
                 },
-                setAttribute: () => {},
+                setAttribute: noop,
                 getAttribute: () => null,
                 getBoundingClientRect: () => ({ left: 0, top: 0, width: 0, height: 0, right: 0, bottom: 0 }),
                 parentNode: null,
@@ -64,12 +62,12 @@ class P5bDOM {
 
         const makeCanvas = () => {
             const c = canvas.createCanvas(1, 1);
-            c.classList = { add: () => {}, remove: () => {}, contains: () => false, toggle: () => {} };
+            c.classList = { add: noop, remove: noop, contains: () => false, toggle: noop };
             c.dataset = {};
-            c.setAttribute = () => {};
+            c.setAttribute = noop;
             c.getAttribute = () => null;
-            c.addEventListener = () => {};
-            c.removeEventListener = () => {};
+            c.addEventListener = noop;
+            c.removeEventListener = noop;
             c.dispatchEvent = () => true;
             c.getBoundingClientRect = () => ({ left: 0, top: 0, width: c.width, height: c.height, right: c.width, bottom: c.height });
             c.parentNode = null;
@@ -87,22 +85,20 @@ class P5bDOM {
             body: {
                 appendChild: (el) => { bodyChildren.push(el); if (el && typeof el === "object") el.parentNode = document.body; return el; },
                 removeChild: (el) => {
-                    const i = bodyChildren.indexOf(el);
-                    if (i > -1) bodyChildren.splice(i, 1);
+                    spliceFrom(bodyChildren, el);
                     if (el && typeof el === "object") el.parentNode = null;
-                    const ci = allCanvases.indexOf(el);
-                    if (ci > -1) allCanvases.splice(ci, 1);
+                    spliceFrom(allCanvases, el);
                     return el;
                 },
                 style: {},
-                classList: { add: () => {}, remove: () => {}, contains: () => false, toggle: () => {} },
+                classList: { add: noop, remove: noop, contains: () => false, toggle: noop },
                 clientWidth: this.width,
                 clientHeight: this.height,
-                addEventListener: () => {},
-                removeEventListener: () => {},
+                addEventListener: noop,
+                removeEventListener: noop,
                 dispatchEvent: () => true,
             },
-            head: { appendChild: () => {}, removeChild: () => {}, getElementsByTagName: () => [] },
+            head: { appendChild: noop, removeChild: noop, getElementsByTagName: () => [] },
             querySelector: (sel) => {
                 if (sel === "canvas") return allCanvases[0] || null;
                 return null;
@@ -118,12 +114,12 @@ class P5bDOM {
                 if (t === "head") return [document.head];
                 return bodyChildren.filter((el) => el.tagName && el.tagName.toLowerCase() === t);
             },
-            documentElement: { style: {}, classList: { add: () => {}, remove: () => {}, contains: () => false }, clientWidth: this.width, clientHeight: this.height },
+            documentElement: { style: {}, classList: { add: noop, remove: noop, contains: () => false }, clientWidth: this.width, clientHeight: this.height },
             readyState: "complete",
-            addEventListener: () => {},
-            removeEventListener: () => {},
+            addEventListener: noop,
+            removeEventListener: noop,
             dispatchEvent: () => true,
-            createEvent: () => ({ initEvent: () => {} }),
+            createEvent: () => ({ initEvent: noop }),
             hasFocus: () => true,
             hidden: false,
         };
@@ -134,8 +130,8 @@ class P5bDOM {
             document,
             screen: { width: this.width, height: this.height },
             navigator: { userAgent: "Node.js", languages: ["en"], language: "en", userLanguage: "en", mediaDevices: null },
-            addEventListener: () => {},
-            removeEventListener: () => {},
+            addEventListener: noop,
+            removeEventListener: noop,
             dispatchEvent: () => true,
             requestAnimationFrame: (cb) => setImmediate(cb),
             cancelAnimationFrame: (id) => clearImmediate(id),
@@ -144,7 +140,7 @@ class P5bDOM {
             devicePixelRatio: 1,
             location: { search: "", pathname: "/", href: "http://localhost/", hash: "" },
             getComputedStyle: () => stubStyle,
-            URL: { createObjectURL: () => "", revokeObjectURL: () => {} },
+            URL: { createObjectURL: () => "", revokeObjectURL: noop },
             Event: class Event { constructor(type) { this.type = type; this.bubbles = false; this.cancelable = false; } },
             MouseEvent: class MouseEvent { constructor(type) { this.type = type; } },
             HTMLCanvasElement: canvas.Canvas,
