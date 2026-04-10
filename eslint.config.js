@@ -50,9 +50,17 @@ module.exports = [
                 height: "readonly",
                 createGraphics: "readonly",
                 loadFont: "readonly",
+                loadJSON: "readonly",
                 noStroke: "readonly",
                 ellipse: "readonly",
-                image: "readonly"
+                image: "readonly",
+                saveCanvas: "readonly",
+                saveJSON: "readonly",
+                print: "readonly",
+                mouseX: "readonly",
+                mouseY: "readonly",
+                key: "readonly",
+                keyCode: "readonly"
             }
         },
         rules: {
@@ -79,9 +87,17 @@ module.exports = [
                 height: "readonly",
                 createGraphics: "readonly",
                 loadFont: "readonly",
+                loadJSON: "readonly",
                 noStroke: "readonly",
                 ellipse: "readonly",
-                image: "readonly"
+                image: "readonly",
+                saveCanvas: "readonly",
+                saveJSON: "readonly",
+                print: "readonly",
+                mouseX: "readonly",
+                mouseY: "readonly",
+                key: "readonly",
+                keyCode: "readonly"
             }
         },
         rules: {

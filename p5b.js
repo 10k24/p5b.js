@@ -161,17 +161,20 @@ class P5b extends EventEmitter {
             }
         }
 
+        global._resolveAssetPath = function(sketchPath, filePath) {
+            const assetDir = sketchPath
+                ? path.dirname(path.resolve(sketchPath))
+                : process.cwd();
+            return path.isAbsolute(filePath)
+                ? filePath
+                : path.resolve(assetDir, filePath);
+        };
+        
         global.loadFont = (function(that) {
             const P5Constructor = that._loadP5();
             return function(fontPath) {
-                const assetDir = that.sketchPath
-                    ? path.dirname(path.resolve(that.sketchPath))
-                    : process.cwd();
-                const fontData = fs.readFileSync(
-                    path.isAbsolute(fontPath)
-                        ? fontPath
-                        : path.resolve(assetDir, fontPath)
-                );
+                const resolvedPath = global._resolveAssetPath(that.sketchPath, fontPath);
+                const fontData = fs.readFileSync(resolvedPath);
                 const parsedFont = opentype.parse(
                     fontData.buffer.slice(fontData.byteOffset, fontData.byteOffset + fontData.byteLength)
                 );
@@ -205,6 +208,56 @@ class P5b extends EventEmitter {
                 return ret;
             };
         })(this, global.createGraphics);
+
+        global.loadJSON = (function(that) {
+            return async function(filePath) {
+                try {
+                    const resolvedPath = global._resolveAssetPath(that.sketchPath, filePath);
+                    // Support both URLs and local file paths
+                    const url = filePath.startsWith("http") ? filePath : `file://${resolvedPath}`;
+                    const response = await global.fetch(url);
+                    if (!response.ok) {
+                        throw new Error(`Failed to load JSON: ${response.status} ${response.statusText}`);
+                    }
+                    return await response.json();
+                } catch (error) {
+                    console.error(`Error loading JSON from ${filePath}:`, error.message);
+                    throw error;
+                }
+            };
+        })(this);
+
+        // File I/O functions - noop in headless environment
+        global.saveCanvas = noop;
+        global.saveFrames = noop;
+        global.saveJSON = noop;
+        global.saveStrings = noop;
+        global.saveTable = noop;
+        global.saveImage = noop;
+        global.print = (msg) => console.log(msg);
+        
+        // Mouse/keyboard event handlers - noop in headless environment
+        global.mousePressed = noop;
+        global.mouseReleased = noop;
+        global.mouseMoved = noop;
+        global.mouseDragged = noop;
+        global.mouseWheel = noop;
+        global.keyPressed = noop;
+        global.keyReleased = noop;
+        global.touchStarted = noop;
+        global.touchEnded = noop;
+        global.touchMoved = noop;
+        
+        // Mouse/keyboard properties - all zero in headless
+        global.mouseX = 0;
+        global.mouseY = 0;
+        global.pmouseX = 0;
+        global.pmouseY = 0;
+        global.key = "";
+        global.keyCode = 0;
+        global.accelerationX = 0;
+        global.accelerationY = 0;
+        global.accelerationZ = 0;
     }
 
     _emitRuntimeError(error, phase) {

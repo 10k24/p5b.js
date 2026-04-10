@@ -146,6 +146,7 @@ class P5bDOM {
             HTMLCanvasElement: canvas.Canvas,
             ImageData: canvas.ImageData,
             performance: { now: () => Date.now() },
+            fetch: global.fetch,
         };
 
         global.window = win;
