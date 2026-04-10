@@ -38,8 +38,25 @@ module.exports = [
             globals: {
                 describe: "readonly",
                 it: "readonly",
-                expect: "readonly"
+                expect: "readonly",
+                createCanvas: "readonly",
+                background: "readonly",
+                fill: "readonly",
+                stroke: "readonly",
+                rect: "readonly",
+                circle: "readonly",
+                frameCount: "readonly",
+                width: "readonly",
+                height: "readonly",
+                createGraphics: "readonly",
+                loadFont: "readonly",
+                noStroke: "readonly",
+                ellipse: "readonly",
+                image: "readonly"
             }
+        },
+        rules: {
+            "no-unused-vars": "off"
         }
     },
     {
@@ -50,8 +67,25 @@ module.exports = [
             globals: {
                 describe: "readonly",
                 it: "readonly",
-                expect: "readonly"
+                expect: "readonly",
+                createCanvas: "readonly",
+                background: "readonly",
+                fill: "readonly",
+                stroke: "readonly",
+                rect: "readonly",
+                circle: "readonly",
+                frameCount: "readonly",
+                width: "readonly",
+                height: "readonly",
+                createGraphics: "readonly",
+                loadFont: "readonly",
+                noStroke: "readonly",
+                ellipse: "readonly",
+                image: "readonly"
             }
+        },
+        rules: {
+            "no-unused-vars": "off"
         }
     },
     {
