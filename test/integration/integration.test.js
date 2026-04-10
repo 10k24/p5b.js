@@ -526,3 +526,119 @@ describe("P5b Integration - Buffer Analysis", () => {
         p5b.run();
     });
 });
+
+describe("P5b Graphics Pooling - Integration", () => {
+    it("should create and remove graphics without throwing", (done) => {
+        const p5b = new P5b({
+            width: 32, height: 32,
+            setup: () => { createCanvas(100, 100); },
+            draw: () => {
+                background(200);
+                const pg = createGraphics(50, 50);
+                pg.background(255);
+                pg.fill(0);
+                pg.rect(10, 10, 30, 30);
+                pg.remove();  // Polyfill override should handle safely
+            }
+        });
+
+        let frameReceived = false;
+        let errorOccurred = false;
+
+        p5b.on("error", () => {
+            errorOccurred = true;
+        });
+
+        p5b.on("frame", (buffer) => {
+            frameReceived = true;
+            expect(buffer).toBeInstanceOf(Uint8Array);
+            expect(errorOccurred).toBe(false);
+            p5b.stop();
+            done();
+        });
+
+        p5b.run();
+    });
+
+    it("should handle multiple graphics with .remove() calls in same frame", (done) => {
+        const p5b = new P5b({
+            width: 32, height: 32,
+            setup: () => { createCanvas(64, 64); },
+            draw: () => {
+                const pg1 = createGraphics(16, 16);
+                pg1.background(255);
+                pg1.remove();
+
+                const pg2 = createGraphics(24, 24);
+                pg2.background(128);
+                pg2.remove();
+            }
+        });
+
+        let errorOccurred = false;
+
+        p5b.on("error", () => {
+            errorOccurred = true;
+        });
+
+        p5b.on("frame", (buffer) => {
+            expect(buffer).toBeInstanceOf(Uint8Array);
+            expect(errorOccurred).toBe(false);
+            p5b.stop();
+            done();
+        });
+
+        p5b.run();
+    });
+
+    it("should call .remove() multiple times safely", (done) => {
+        const p5b = new P5b({
+            width: 32, height: 32,
+            setup: () => { createCanvas(64, 64); },
+            draw: () => {
+                const pg = createGraphics(16, 16);
+                pg.background(100);
+                pg.remove();
+                pg.remove();  // Should not throw on second call
+            }
+        });
+
+        let errorOccurred = false;
+
+        p5b.on("error", () => {
+            errorOccurred = true;
+        });
+
+        p5b.on("frame", (buffer) => {
+            expect(buffer).toBeInstanceOf(Uint8Array);
+            expect(errorOccurred).toBe(false);
+            p5b.stop();
+            done();
+        });
+
+        p5b.run();
+    });
+
+    it("should render graphics created in draw() successfully", (done) => {
+        const p5b = new P5b({
+            width: 32, height: 32,
+            setup: () => { createCanvas(100, 100); },
+            draw: () => {
+                background(200);
+                const pg = createGraphics(30, 30);
+                pg.background(100, 200, 50);
+                image(pg, 0, 0);
+                pg.remove();
+            }
+        });
+
+        p5b.on("frame", (buffer) => {
+            expect(buffer).toBeInstanceOf(Uint8Array);
+            expect(buffer.length).toBe(32 * 32 * 4);
+            p5b.stop();
+            done();
+        });
+
+        p5b.run();
+    });
+});
