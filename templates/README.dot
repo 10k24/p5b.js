@@ -136,7 +136,7 @@ For streaming frames to external systems, see [examples/ex-p5b-zmq.js](examples/
 
 ## Environment
 
-**Node.js only.** p5b uses JSDOM for headless Canvas and native Node.js APIs. Browsers are not supported.
+**Node.js only.** p5b uses a custom headless DOM shim with native Node.js APIs and `canvas`. Browsers are not supported.
 
 ## Credits
 
