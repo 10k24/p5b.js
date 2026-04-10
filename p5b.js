@@ -86,7 +86,7 @@ class P5b extends EventEmitter {
         return this._metrics;
     }
 
-     _loadP5() {
+    _loadP5() {
         return require("p5").default || require("p5");
     }
 
