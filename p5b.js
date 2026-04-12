@@ -66,8 +66,23 @@ class P5b extends EventEmitter {
         if (!this._destCanvas) {
             this._destCanvas = canvas.createCanvas(this.width, this.height);
         }
-        this._destCanvas.getContext("2d").clearRect(0, 0, this.width, this.height);
-        this._destCanvas.getContext("2d").drawImage(srcCanvas, 0, 0, srcCanvas.width, srcCanvas.height, 0, 0, this.width, this.height);
+
+        const ctx = this._destCanvas.getContext("2d");
+        
+        // Ensure a blank canvas on all pixels when not stretching source frame
+        ctx.clearRect(0, 0, this.width, this.height);
+
+        // Fit to destination, do not stretch
+        const xRatio = this.width / srcCanvas.width;
+        const yRatio = this.height / srcCanvas.height;
+        const scaleFactor = Math.min(xRatio, yRatio);
+
+        ctx.drawImage(
+            srcCanvas,
+            0, 0, srcCanvas.width, srcCanvas.height,
+            0, 0, srcCanvas.width * scaleFactor, srcCanvas.height * scaleFactor
+        );
+
         const ret = new Uint8Array(this._destCanvas.toBuffer("raw"));
 
         // Swap pixel data order BGRA -> RGBA
