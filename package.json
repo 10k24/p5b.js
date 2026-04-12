@@ -29,8 +29,9 @@
         "headless"
     ],
     "scripts": {
-        "test": "bun test",
+        "test": "bun run pretest && bun test",
         "test:watch": "bun test --watch",
+        "pretest": "bun run lint && bun run docs",
         "lint": "bunx eslint",
         "lint:fix": "bunx eslint --fix",
         "docs": "node scripts/build-readme.js"

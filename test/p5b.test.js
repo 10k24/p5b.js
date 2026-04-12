@@ -289,3 +289,18 @@ describe("P5b Global Bindings", () => {
         p5b.run();
     });
 });
+
+describe("P5bDOM", () => {
+    it("should create DOM stub with correct dimensions", () => {
+        const dom = new P5bDOM(100, 100);
+        expect(dom.width).toBe(100);
+        expect(dom.height).toBe(100);
+    });
+
+    it("should clear internal arrays", () => {
+        const dom = new P5bDOM(32, 32);
+        dom.clear();
+        expect(dom._bodyChildren.length).toBe(0);
+        expect(dom._canvases.length).toBe(0);
+    });
+});

@@ -144,3 +144,91 @@ describe("P5b Real Sketch - Graphics Pooling", () => {
         p5b.run();
     });
 });
+
+describe("P5b Real Sketch - loadImage", () => {
+    it("should render image with correct pixel colors at 32x32", (done) => {
+        const p5b = new P5b({
+            sketchPath: path.join(sketchesDir, "loadimage.js"),
+            width: 32,
+            height: 32,
+            fps: 30
+        });
+
+        p5b.on("error", (err) => {
+            p5b.stop();
+            done(err.error);
+        });
+
+        p5b.on("frame", (buffer) => {
+            expect(buffer).toBeInstanceOf(Uint8Array);
+            expect(buffer.length).toBe(32 * 32 * 4);
+
+            const px = (x, y) => {
+                const i = (y * 32 + x) * 4;
+                return [buffer[i], buffer[i + 1], buffer[i + 2]];
+            };
+
+            // Verify image content is rendered (not empty)
+            const topLeft = px(0, 0);
+            expect(topLeft[0]).toBeGreaterThan(200);  // Image has color content
+            expect(topLeft[1]).toBeGreaterThan(200);
+            expect(topLeft[2]).toBeGreaterThan(200);
+
+            // Verify specific positions have image content (not blue)
+            const midImage = px(17, 14);
+            expect(midImage[0]).toBeGreaterThan(190);
+            expect(midImage[1]).toBeGreaterThan(190);
+            expect(midImage[2]).toBeGreaterThan(180);
+
+            // Verify blue background shows through in the bottom region
+            // (canvas is 7954x7954, image is 7954x5305, so y > 21 in output is blue)
+            const corner = px(31, 31);
+            expect(corner).toEqual([0, 0, 255]);
+            
+            // Check a position definitely in blue region (y >= 22)
+            const bottomArea = px(22, 22);
+            expect(bottomArea).toEqual([0, 0, 255]);
+
+            p5b.stop();
+            done();
+        });
+
+        p5b.run();
+    });
+});
+
+describe("P5b Real Sketch - Scaling", () => {
+    it("should scale 4x4 canvas to 2x2 output", (done) => {
+        const p5b = new P5b({
+            sketchPath: path.join(sketchesDir, "scaling.js"),
+            width: 2,
+            height: 2,
+            fps: 30
+        });
+
+        p5b.on("error", (err) => {
+            p5b.stop();
+            done(err.error);
+        });
+
+        p5b.on("frame", (buffer) => {
+            expect(buffer).toBeInstanceOf(Uint8Array);
+            expect(buffer.length).toBe(2 * 2 * 4);
+
+            const px = (x, y) => {
+                const i = (y * 2 + x) * 4;
+                return [buffer[i], buffer[i + 1], buffer[i + 2]];
+            };
+
+            expect(px(0, 0)).toEqual([255, 0, 0]);     // red - top-left 2x2 region scaled to 1x1
+            expect(px(1, 0)).toEqual([255, 255, 255]); // white - rest is white
+            expect(px(0, 1)).toEqual([255, 255, 255]); // white
+            expect(px(1, 1)).toEqual([255, 255, 255]); // white
+
+            p5b.stop();
+            done();
+        });
+
+        p5b.run();
+    });
+});

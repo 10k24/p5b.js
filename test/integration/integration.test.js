@@ -98,6 +98,118 @@ describe("P5b Integration - Buffer Analysis", () => {
         testBackgroundColorScenarios(done);
     });
 
+    it("should handle canvas larger than output with filler pixels", (done) => {
+        const p5b = new P5b({
+            width: 4,
+            height: 8,
+            fps: 30,
+            setup: () => {
+                createCanvas(8, 8);
+                background(255, 0, 0);
+            },
+            draw: () => {
+                noLoop();
+            }
+        });
+
+        p5b.on("frame", (buffer) => {
+            expect(buffer.length).toBe(4 * 8 * 4);
+            
+            const px = (x, y) => {
+                const i = (y * 4 + x) * 4;
+                return [buffer[i], buffer[i+1], buffer[i+2], buffer[i+3]];
+            };
+
+            expect(px(0, 0)).toEqual([255, 0, 0, 255]);
+            expect(px(3, 0)).toEqual([255, 0, 0, 255]);
+            expect(px(0, 3)).toEqual([255, 0, 0, 255]);
+            expect(px(3, 3)).toEqual([255, 0, 0, 255]);
+            
+            // Blank buffer expected below the scaled frame
+            expect(px(0, 4)).toEqual([0, 0, 0, 0]);
+            expect(px(0, 7)).toEqual([0, 0, 0, 0]);
+            expect(px(4, 4)).toEqual([0, 0, 0, 0]);
+            expect(px(4, 7)).toEqual([0, 0, 0, 0]);
+
+            p5b.stop();
+            done();
+        });
+
+        p5b.run();
+    });
+
+    it("should handle canvas wider than output with filler pixels", (done) => {
+        const p5b = new P5b({
+            width: 8,
+            height: 4,
+            fps: 30,
+            setup: () => {
+                createCanvas(8, 8);
+                background(255, 0, 0);
+            },
+            draw: () => {
+                noLoop();
+            }
+        });
+
+        p5b.on("frame", (buffer) => {
+            expect(buffer.length).toBe(8 * 4 * 4);
+            
+            const px = (x, y) => {
+                const i = (y * 8 + x) * 4;
+                return [buffer[i], buffer[i+1], buffer[i+2], buffer[i+3]];
+            };
+
+            expect(px(0, 0)).toEqual([255, 0, 0, 255]);
+            expect(px(7, 0)).toEqual([255, 0, 0, 255]);
+            expect(px(0, 3)).toEqual([255, 0, 0, 255]);
+            expect(px(7, 3)).toEqual([255, 0, 0, 255]);
+
+            // Blank buffer expected after the scaled frame
+            expect(px(4, 0)).toEqual([0, 0, 0, 0]);
+            expect(px(7, 0)).toEqual([0, 0, 0, 0]);
+            expect(px(4, 4)).toEqual([0, 0, 0, 0]);
+            expect(px(4, 7)).toEqual([0, 0, 0, 0]);
+
+            p5b.stop();
+            done();
+        });
+
+        p5b.run();
+    });
+
+    it("should scale canvas to smaller output without filler", (done) => {
+        const p5b = new P5b({
+            width: 4,
+            height: 4,
+            fps: 30,
+            setup: () => {
+                createCanvas(8, 8);
+                background(255, 0, 0);
+            },
+            draw: () => {
+                noLoop();
+            }
+        });
+
+        p5b.on("frame", (buffer) => {
+            expect(buffer.length).toBe(4 * 4 * 4);
+            
+            const px = (x, y) => {
+                const i = (y * 4 + x) * 4;
+                return [buffer[i], buffer[i+1], buffer[i+2], buffer[i+3]];
+            };
+
+            expect(px(0, 0)).toEqual([255, 0, 0, 255]);
+            expect(px(3, 3)).toEqual([255, 0, 0, 255]);
+
+            p5b.stop();
+            done();
+        });
+
+        p5b.run();
+    });
+
     it("should emit buffers with correct dimensions", (done) => {
         const WIDTH = 64;
         const HEIGHT = 64;
@@ -192,13 +304,14 @@ describe("P5b Integration - Buffer Analysis", () => {
                 createCanvas(400, 400);
             },
             draw: () => {
-                background(100, 150, 200);
+                background(100, 150, 200, 120);
             }
         });
 
         p5b.on("frame", (buffer) => {
-            for (let i = 3; i < Math.min(buffer.length, 64); i += 4) {
-                expect(buffer[i]).toBe(255);
+            for (let i = 0; i < Math.min(buffer.length, 64); i += 4) {
+                expect(buffer[i]).toBe(100);
+                expect(buffer[i+3]).toBe(120);
             }
             p5b.stop();
             done();
@@ -223,13 +336,18 @@ describe("P5b Integration - Buffer Analysis", () => {
                 gfx.background(100, 200, 50);
                 gfx.loadPixels();
                 image(gfx, 0, 0);
+                noLoop();
             }
         });
 
         p5b.on("frame", (buffer) => {
             const r = buffer[0];
+            const g = buffer[1];
+            const b = buffer[2];
             const a = buffer[3];
             expect(r).toBe(100);
+            expect(g).toBe(200);
+            expect(b).toBe(50);
             expect(a).toBe(255);
 
             let offset = WIDTH/2 * 4;
@@ -635,6 +753,111 @@ describe("P5b Graphics Pooling - Integration", () => {
         p5b.on("frame", (buffer) => {
             expect(buffer).toBeInstanceOf(Uint8Array);
             expect(buffer.length).toBe(32 * 32 * 4);
+            p5b.stop();
+            done();
+        });
+
+        p5b.run();
+    });
+});
+
+describe("P5b Integration - loadImage", () => {
+    it("should load image in preload and render in draw", (done) => {
+        const testImagePath = path.join(__dirname, "../fixtures/img/natalie-kinnear-CC2Bfvk2-tU-unsplash.jpg");
+        let loadedImg = null;
+
+        const p5b = new P5b({
+            width: 32, height: 32,
+            fps: 30,
+            preload: () => {
+                loadedImg = loadImage(testImagePath);
+            },
+            setup: () => {
+                createCanvas(loadedImg.width, loadedImg.height);
+            },
+            draw: () => {
+                background(0);
+                image(loadedImg, 0, 0, loadedImg.width, loadedImg.height);
+                noLoop();
+            }
+        });
+
+        p5b.on("error", (err) => {
+            p5b.stop();
+            done(err.error);
+        });
+
+        p5b.on("frame", (buffer) => {
+            expect(buffer).toBeInstanceOf(Uint8Array);
+            expect(buffer.length).toBe(32 * 32 * 4);
+
+            const hasColor = buffer.slice(0, 256).some((v, i) => i % 4 !== 3 && v > 0);
+            expect(hasColor).toBe(true);
+
+            p5b.stop();
+            done();
+        });
+
+        p5b.run();
+    });
+
+    it("should handle loadImage error gracefully", (done) => {
+        let error = null;
+
+        const p5b = new P5b({
+            width: 32, height: 32,
+            fps: 30,
+            preload: () => {
+                loadImage("does-not-exist.jpg", () => {}, (err) => {
+                    error = err;
+                });
+            },
+            setup: () => {
+                createCanvas(100, 100);
+            },
+            draw: () => {
+                background(0);
+                noLoop();
+            }
+        });
+
+        p5b.on("frame", (_buffer) => {
+            p5b.stop();
+            done();
+        });
+
+        p5b.run();
+    });
+
+    it("should scale image when drawing with different dimensions", (done) => {
+        const testImagePath = path.join(__dirname, "../fixtures/img/natalie-kinnear-CC2Bfvk2-tU-unsplash.jpg");
+        let loadedImg = null;
+
+        const p5b = new P5b({
+            width: 16, height: 16,
+            fps: 30,
+            preload: () => {
+                loadedImg = loadImage(testImagePath);
+            },
+            setup: () => {
+                createCanvas(loadedImg.width, loadedImg.height);
+            },
+            draw: () => {
+                background(0);
+                image(loadedImg, 0, 0, 16, 16);
+                noLoop();
+            }
+        });
+
+        p5b.on("error", (err) => {
+            p5b.stop();
+            done(err.error);
+        });
+
+        p5b.on("frame", (buffer) => {
+            expect(buffer).toBeInstanceOf(Uint8Array);
+            expect(buffer.length).toBe(16 * 16 * 4);
+
             p5b.stop();
             done();
         });

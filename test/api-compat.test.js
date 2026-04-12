@@ -98,3 +98,43 @@ describe("API Compatibility: Mouse/Keyboard Properties", () => {
         p5b.run();
     });
 });
+
+describe("API Compatibility: loadImage", () => {
+    it("should load a local image file", (done) => {
+        const testImagePath = path.join("test/fixtures/img", "natalie-kinnear-CC2Bfvk2-tU-unsplash.jpg");
+        let loadedImg = null;
+        const p5b = new P5b({
+            preload: function() {
+                loadedImg = loadImage(testImagePath);
+            },
+            setup: function() {},
+            draw: function() {}
+        });
+        p5b.on("frame", () => {
+            expect(loadedImg).toBeDefined();
+            expect(loadedImg.width).toBeGreaterThan(0);
+            expect(loadedImg.height).toBeGreaterThan(0);
+            p5b.stop();
+            done();
+        });
+        p5b.run();
+    });
+
+    it("should call failureCallback on missing image file", (done) => {
+        let error = null;
+        const p5b = new P5b({
+            preload: function() {
+                loadImage("does-not-exist.jpg", null, function(err) { error = err; });
+            },
+            setup: function() {},
+            draw: function() {}
+        });
+        p5b.on("frame", () => {
+            expect(error).toBeDefined();
+            expect(/Failed to load image|ENOENT/.test(error.message)).toBe(true);
+            p5b.stop();
+            done();
+        });
+        p5b.run();
+    });
+});

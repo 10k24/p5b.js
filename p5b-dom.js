@@ -152,6 +152,7 @@ class P5bDOM {
         global.window = win;
         global.document = document;
         global.screen = win.screen;
+
         if (!Object.getOwnPropertyDescriptor(global, "navigator")) {
             Object.defineProperty(global, "navigator", {
                 get: () => global.window.navigator,
