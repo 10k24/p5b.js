@@ -350,7 +350,7 @@ describe("P5b Integration - Buffer Analysis", () => {
             expect(b).toBe(50);
             expect(a).toBe(255);
 
-            let offset = WIDTH/2 * 4;
+            const offset = WIDTH/2 * 4;
             const r2 = buffer[offset];
             const g2 = buffer[offset+1];
             const b2 = buffer[offset+2];
