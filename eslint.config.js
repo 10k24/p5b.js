@@ -15,7 +15,14 @@ module.exports = [
                 clearImmediate: "readonly",
                 Buffer: "readonly",
                 setInterval: "readonly",
-                clearInterval: "readonly"
+                clearInterval: "readonly",
+                setTimeout: "readonly",
+                createCanvas: "readonly",
+                background: "readonly",
+                createGraphics: "readonly",
+                fill: "readonly",
+                noStroke: "readonly",
+                rect: "readonly"
             }
         },
         rules: {
@@ -60,7 +67,14 @@ module.exports = [
                 mouseX: "readonly",
                 mouseY: "readonly",
                 key: "readonly",
-                keyCode: "readonly"
+                keyCode: "readonly",
+                mousePressed: "readonly",
+                keyPressed: "readonly",
+                touchStarted: "readonly",
+                accelerationX: "readonly",
+                accelerationY: "readonly",
+                accelerationZ: "readonly",
+                loadImage: "readonly"
             }
         },
         rules: {
@@ -97,7 +111,14 @@ module.exports = [
                 mouseX: "readonly",
                 mouseY: "readonly",
                 key: "readonly",
-                keyCode: "readonly"
+                keyCode: "readonly",
+                mousePressed: "readonly",
+                keyPressed: "readonly",
+                touchStarted: "readonly",
+                accelerationX: "readonly",
+                accelerationY: "readonly",
+                accelerationZ: "readonly",
+                loadImage: "readonly"
             }
         },
         rules: {
