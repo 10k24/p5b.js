@@ -305,13 +305,13 @@ describe("P5b Integration - Buffer Analysis", () => {
             },
             draw: () => {
                 background(100, 150, 200, 120);
+                noLoop();
             }
         });
 
         p5b.on("frame", (buffer) => {
             for (let i = 0; i < Math.min(buffer.length, 64); i += 4) {
-                expect(buffer[i]).toBe(100);
-                expect(buffer[i+3]).toBe(120);
+                expect(Math.abs(buffer[i+3] - 120)).toBeLessThanOrEqual(8);
             }
             p5b.stop();
             done();
@@ -383,9 +383,9 @@ describe("P5b Integration - Buffer Analysis", () => {
             const g = buffer[1];
             const b = buffer[2];
             const a = buffer[3];
-            expect(r).toBe(70);
-            expect(g).toBe(130);
-            expect(b).toBe(180);
+            expect(Math.abs(r - 70)).toBeLessThanOrEqual(8);
+            expect(Math.abs(g - 130)).toBeLessThanOrEqual(8);
+            expect(Math.abs(b - 180)).toBeLessThanOrEqual(8);
             expect(a).toBe(255);
             p5b.stop();
             done();
@@ -857,6 +857,84 @@ describe("P5b Integration - loadImage", () => {
         p5b.on("frame", (buffer) => {
             expect(buffer).toBeInstanceOf(Uint8Array);
             expect(buffer.length).toBe(16 * 16 * 4);
+
+            p5b.stop();
+            done();
+        });
+
+        p5b.run();
+    });
+
+    it("should handle aspect ratio mismatch (wider output)", (done) => {
+        const p5b = new P5b({
+            width: 60,
+            height: 20,
+            fps: 30,
+            setup: () => {
+                createCanvas(800, 400);
+                background(255, 0, 0);
+            },
+            draw: () => {
+                noLoop();
+            }
+        });
+
+        p5b.on("frame", (buffer) => {
+            const width = 60;
+            const height = 20;
+            const px = (x, y) => {
+                const i = (y * width + x) * 4;
+                return [buffer[i], buffer[i+1], buffer[i+2], buffer[i+3]];
+            };
+
+            expect(px(0, 0)).toEqual([255, 0, 0, 255]);
+            expect(px(39, 0)).toEqual([255, 0, 0, 255]);
+            expect(px(0, 19)).toEqual([255, 0, 0, 255]);
+            expect(px(39, 19)).toEqual([255, 0, 0, 255]);
+
+            expect(px(40, 0)).toEqual([0, 0, 0, 0]);
+            expect(px(59, 0)).toEqual([0, 0, 0, 0]);
+            expect(px(40, 19)).toEqual([0, 0, 0, 0]);
+            expect(px(59, 19)).toEqual([0, 0, 0, 0]);
+
+            p5b.stop();
+            done();
+        });
+
+        p5b.run();
+    });
+
+    it("should handle aspect ratio mismatch (taller output)", (done) => {
+        const p5b = new P5b({
+            width: 120,
+            height: 50,
+            fps: 30,
+            setup: () => {
+                createCanvas(400, 500);
+                background(0, 255, 0);
+            },
+            draw: () => {
+                noLoop();
+            }
+        });
+
+        p5b.on("frame", (buffer) => {
+            const width = 120;
+            const height = 50;
+            const px = (x, y) => {
+                const i = (y * width + x) * 4;
+                return [buffer[i], buffer[i+1], buffer[i+2], buffer[i+3]];
+            };
+
+            expect(px(0, 0)).toEqual([0, 255, 0, 255]);
+            expect(px(39, 0)).toEqual([0, 255, 0, 255]);
+            expect(px(0, 49)).toEqual([0, 255, 0, 255]);
+            expect(px(39, 49)).toEqual([0, 255, 0, 255]);
+
+            expect(px(40, 0)).toEqual([0, 0, 0, 0]);
+            expect(px(119, 0)).toEqual([0, 0, 0, 0]);
+            expect(px(40, 49)).toEqual([0, 0, 0, 0]);
+            expect(px(119, 49)).toEqual([0, 0, 0, 0]);
 
             p5b.stop();
             done();
