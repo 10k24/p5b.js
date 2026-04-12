@@ -128,8 +128,8 @@ describe("P5b Integration - Buffer Analysis", () => {
             // Blank buffer expected below the scaled frame
             expect(px(0, 4)).toEqual([0, 0, 0, 0]);
             expect(px(0, 7)).toEqual([0, 0, 0, 0]);
-            expect(px(4, 4)).toEqual([0, 0, 0, 0]);
-            expect(px(4, 7)).toEqual([0, 0, 0, 0]);
+            expect(px(3, 4)).toEqual([0, 0, 0, 0]);
+            expect(px(3, 7)).toEqual([0, 0, 0, 0]);
 
             p5b.stop();
             done();
@@ -161,15 +161,15 @@ describe("P5b Integration - Buffer Analysis", () => {
             };
 
             expect(px(0, 0)).toEqual([255, 0, 0, 255]);
-            expect(px(7, 0)).toEqual([255, 0, 0, 255]);
+            expect(px(3, 0)).toEqual([255, 0, 0, 255]);
             expect(px(0, 3)).toEqual([255, 0, 0, 255]);
-            expect(px(7, 3)).toEqual([255, 0, 0, 255]);
+            expect(px(3, 3)).toEqual([255, 0, 0, 255]);
 
             // Blank buffer expected after the scaled frame
             expect(px(4, 0)).toEqual([0, 0, 0, 0]);
             expect(px(7, 0)).toEqual([0, 0, 0, 0]);
-            expect(px(4, 4)).toEqual([0, 0, 0, 0]);
-            expect(px(4, 7)).toEqual([0, 0, 0, 0]);
+            expect(px(4, 3)).toEqual([0, 0, 0, 0]);
+            expect(px(7, 3)).toEqual([0, 0, 0, 0]);
 
             p5b.stop();
             done();
