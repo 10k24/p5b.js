@@ -232,3 +232,63 @@ describe("P5b Real Sketch - Scaling", () => {
         p5b.run();
     });
 });
+
+describe("P5b Real Sketch - Globals", () => {
+    it("should verify all math globals work correctly in sketch", (done) => {
+        const p5b = new P5b({
+            sketchPath: path.join(sketchesDir, "globals.js"),
+            width: 16,
+            height: 16,
+            fps: 30
+        });
+        p5b.on("error", (err) => {
+            p5b.stop();
+            done(err.error);
+        });
+        p5b.on("frame", (buffer) => {
+            expect(global.results.pi).toBe(Math.PI);
+            expect(global.results.two_pi).toBe(Math.PI * 2);
+            expect(global.results.half_pi).toBe(Math.PI / 2);
+            expect(global.results.quarter_pi).toBe(Math.PI / 4);
+            expect(global.results.tau).toBe(Math.PI * 2);
+            expect(global.results.degrees).toBe("degrees");
+            expect(global.results.radians).toBe("radians");
+            expect(global.results.abs).toBe(5);
+            expect(global.results.ceil).toBe(5);
+            expect(global.results.floor).toBe(4);
+            expect(global.results.round).toBe(5);
+            expect(global.results.pow).toBe(8);
+            expect(global.results.sqrt).toBe(4);
+            expect(global.results.exp).toBeCloseTo(Math.E, 5);
+            expect(global.results.log).toBe(1);
+            expect(global.results.max).toBe(5);
+            expect(global.results.min).toBe(1);
+            expect(global.results.sq).toBe(16);
+            expect(global.results.sq_neg).toBe(9);
+            expect(global.results.mag).toBe(5);
+            expect(global.results.fract).toBe(0.5);
+            expect(global.results.fract_int).toBe(0);
+            expect(global.results.fract_neg).toBe(0.5);
+            expect(global.results.map).toBe(500);
+            expect(global.results.lerp).toBe(50);
+            expect(global.results.constrain).toBe(100);
+            expect(global.results.constrain_in_range).toBe(50);
+            expect(global.results.dist).toBe(5);
+            expect(global.results.dist_3d).toBeCloseTo(5.385, 0.01);
+            expect(typeof global.results.random).toBe("number");
+            expect(typeof global.results.noise).toBe("number");
+            expect(global.results.norm).toBe(0.4);
+            expect(global.results.abs_neg).toBe(1);
+            expect(global.results.ceil_neg).toBe(-1);
+            expect(global.results.floor_neg).toBe(-2);
+            expect(global.results.dist_identical).toBe(0);
+            expect(global.results.dist_identical_3d).toBe(0);
+            expect(global.results.lerp_start).toBe(0);
+            expect(global.results.lerp_stop).toBe(5);
+            expect(global.results.lerp_avg).toBe(2.5);
+            p5b.stop();
+            done();
+        });
+        p5b.run();
+    });
+});
