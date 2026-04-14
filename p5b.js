@@ -27,6 +27,7 @@ class P5b extends EventEmitter {
         this._destCanvas = null;
         this._gfxPool = new Map();
         this._gfxActive = [];
+        this._redrawing = false;
         this._metrics = {
             framesDrawn: 0,
             errors: 0
@@ -153,10 +154,16 @@ class P5b extends EventEmitter {
             }
         };
 
+        global.redraw = (...args) => {
+            this._redrawing = true;
+            try { this._myP5.redraw(...args); }
+            finally { this._redrawing = false; }
+        };
+
         this._myP5.draw = () => {
             try {
-                // if noLoop() is called, always draw at least one frame
-                if (this._metrics.framesDrawn > 0 && !this._myP5.isLooping()) {
+                // Block animation loop calls when stopped, but always allow redraw() through
+                if (!this._redrawing && this._metrics.framesDrawn > 0 && !this._myP5.isLooping()) {
                     return;
                 }
 

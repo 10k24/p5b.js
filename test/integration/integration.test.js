@@ -648,7 +648,7 @@ describe("P5b Integration - Buffer Analysis", () => {
     });
 });
 
-describe("P5b Graphics Pooling - Integration", () => {
+describe("P5b Integration - Graphics Pooling", () => {
     it("should create and remove graphics without throwing", (done) => {
         const p5b = new P5b({
             width: 32, height: 32,
@@ -1231,6 +1231,243 @@ describe("P5b Integration - Loop Control", () => {
             p5b.stop();
             done();
         });
+
+        p5b.run();
+    });
+
+    it("should report isLooping as false after noLoop()", (done) => {
+        let loopingAfterNoLoop;
+        const p5b = new P5b({
+            width: 16, height: 16,
+            fps: 30,
+            setup: () => { createCanvas(100, 100); },
+            draw: () => {
+                if (frameCount === 1) {
+                    noLoop();
+                    loopingAfterNoLoop = isLooping();
+                }
+            }
+        });
+
+        p5b.on("frame", () => {
+            expect(loopingAfterNoLoop).toBe(false);
+            p5b.stop();
+            done();
+        });
+
+        p5b.run();
+    });
+
+    it("should stop at correct frame count when noLoop called after N frames", (done) => {
+        let drawCalls = 0;
+        const p5b = new P5b({
+            width: 16, height: 16,
+            fps: 60,
+            setup: () => { createCanvas(100, 100); },
+            draw: () => {
+                drawCalls++;
+                if (drawCalls === 3) noLoop();
+            }
+        });
+
+        let framesReceived = 0;
+        p5b.on("frame", () => { framesReceived++; });
+
+        setTimeout(() => {
+            expect(framesReceived).toBe(3);
+            p5b.stop();
+            done();
+        }, 500);
+
+        p5b.run();
+    });
+
+    it("should handle multiple noLoop() calls idempotently", (done) => {
+        let drawCalls = 0;
+        const p5b = new P5b({
+            width: 16, height: 16,
+            fps: 60,
+            setup: () => { createCanvas(100, 100); },
+            draw: () => {
+                drawCalls++;
+                if (drawCalls === 1) {
+                    noLoop();
+                    noLoop();
+                    noLoop();
+                }
+            }
+        });
+
+        let framesReceived = 0;
+        p5b.on("frame", () => { framesReceived++; });
+
+        setTimeout(() => {
+            expect(framesReceived).toBe(1);
+            p5b.stop();
+            done();
+        }, 500);
+
+        p5b.run();
+    });
+
+    it("should handle loop() while already looping without doubling frame rate", (done) => {
+        let drawCalls = 0;
+        const p5b = new P5b({
+            width: 16, height: 16,
+            fps: 30,
+            setup: () => { createCanvas(100, 100); },
+            draw: () => {
+                drawCalls++;
+                loop(); // redundant, already looping
+                if (drawCalls >= 5) noLoop();
+            }
+        });
+
+        let framesReceived = 0;
+        p5b.on("frame", () => { framesReceived++; });
+
+        setTimeout(() => {
+            // Should get exactly 5 frames, not double due to redundant loop() calls
+            expect(framesReceived).toBe(5);
+            p5b.stop();
+            done();
+        }, 500);
+
+        p5b.run();
+    });
+
+    it("should support noLoop() -> loop() -> noLoop() toggle", (done) => {
+        let drawCalls = 0;
+        const p5b = new P5b({
+            width: 16, height: 16,
+            fps: 60,
+            setup: () => { createCanvas(100, 100); },
+            draw: () => {
+                drawCalls++;
+                if (drawCalls === 2) noLoop();
+            }
+        });
+
+        let framesReceived = 0;
+        p5b.on("frame", () => { framesReceived++; });
+
+        // After first stop: resume, let 2 more frames fire, then stop again
+        setTimeout(() => {
+            expect(framesReceived).toBe(2);
+            loop();
+        }, 150);
+
+        setTimeout(() => {
+            expect(framesReceived).toBeGreaterThan(2); // resumed and got more frames
+            noLoop();
+        }, 300);
+
+        setTimeout(() => {
+            const countAfterSecondStop = framesReceived;
+            setTimeout(() => {
+                // No new frames after second noLoop
+                expect(framesReceived).toBe(countAfterSecondStop);
+                p5b.stop();
+                done();
+            }, 150);
+        }, 350);
+
+        p5b.run();
+    });
+
+    it("should support external noLoop() called from outside draw", (done) => {
+        const p5b = new P5b({
+            width: 16, height: 16,
+            fps: 60,
+            setup: () => { createCanvas(100, 100); },
+            draw: () => { /* continuous */ }
+        });
+
+        let framesReceived = 0;
+        p5b.on("frame", () => { framesReceived++; });
+
+        setTimeout(() => { noLoop(); }, 100);
+
+        setTimeout(() => {
+            const countAtStop = framesReceived;
+            expect(countAtStop).toBeGreaterThan(0);
+            setTimeout(() => {
+                // No new frames after external noLoop
+                expect(framesReceived).toBe(countAtStop);
+                p5b.stop();
+                done();
+            }, 200);
+        }, 150);
+
+        p5b.run();
+    });
+
+    it("should support redraw() triggering one frame while stopped", (done) => {
+        let drawCalls = 0;
+        const p5b = new P5b({
+            width: 16, height: 16,
+            fps: 60,
+            setup: () => {
+                createCanvas(100, 100);
+                noLoop();
+            },
+            draw: () => { drawCalls++; }
+        });
+
+        let framesReceived = 0;
+        p5b.on("frame", () => { framesReceived++; });
+
+        // After initial frame from setup, call redraw() twice externally
+        setTimeout(() => {
+            expect(framesReceived).toBe(1); // only the initial frame
+            redraw();
+        }, 100);
+
+        setTimeout(() => {
+            expect(framesReceived).toBe(2); // one more from redraw()
+            redraw();
+        }, 200);
+
+        setTimeout(() => {
+            expect(framesReceived).toBe(3); // one more from second redraw()
+            p5b.stop();
+            done();
+        }, 300);
+
+        p5b.run();
+    });
+
+    it("should preserve frameCount correctly after loop() resume", (done) => {
+        let frameCountAtResume;
+        let frameCountAfterResume;
+        let drawCalls = 0;
+        const p5b = new P5b({
+            width: 16, height: 16,
+            fps: 60,
+            setup: () => { createCanvas(100, 100); },
+            draw: () => {
+                drawCalls++;
+                if (drawCalls === 3) {
+                    frameCountAtResume = frameCount;
+                    noLoop();
+                }
+                if (drawCalls === 4) {
+                    frameCountAfterResume = frameCount;
+                    noLoop();
+                }
+            }
+        });
+
+        p5b.on("frame", () => {});
+
+        setTimeout(() => { loop(); }, 200);
+
+        setTimeout(() => {
+            // frameCount should be > frameCountAtResume (not reset to 0)
+            expect(frameCountAfterResume).toBeGreaterThan(frameCountAtResume);
+            p5b.stop();
+            done();
+        }, 500);
 
         p5b.run();
     });
