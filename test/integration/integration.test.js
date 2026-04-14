@@ -1129,32 +1129,27 @@ describe("P5b Integration - Loop Control", () => {
     });
     
     it("should stop emitting frames after noLoop() in setup", (done) => {
-        let frameCount = 0;
-        let isLooping;
+        let framesReceived = 0;
         const p5b = new P5b({
             width: 16, height: 16,
             fps: 30,
-            setup: () => { 
-                createCanvas(100, 100); 
+            setup: () => {
+                createCanvas(100, 100);
                 noLoop();
             },
-            draw: () => {
-                isLooping = isLooping();
-                frameCount++;
-            }
+            draw: () => { /* intentionally empty */ }
         });
-        
-        p5b.on("frame", (buffer) => {
-            frameCount++;
-        });
-        
+
+        p5b.on("frame", () => { framesReceived++; });
+
         setTimeout(() => {
-            expect(isLooping).toBe(true);
-            // Should only get ONE frame (setup execution), not continuous
-            expect(frameCount).toBe(0);
+            // draw() always runs at least once, then stops (not continuous)
+            expect(framesReceived).toBe(1);
             p5b.stop();
             done();
         }, 500);
+
+        p5b.run();
     });
     
     it("should emit exactly one frame when noLoop called in draw", (done) => {
@@ -1181,38 +1176,43 @@ describe("P5b Integration - Loop Control", () => {
             p5b.stop();
             done();
         }, 500);
+
+        p5b.run();
     });
-    
+
     it("should resume frame emission after loop() called", (done) => {
         let frameCount = 0;
+        let noLoopCalled = false;
         const p5b = new P5b({
             width: 16, height: 16,
             fps: 30,
-            setup: () => { 
-                createCanvas(100, 100); 
-                noLoop();
-            },
-            draw: () => { 
+            setup: () => { createCanvas(100, 100); },
+            draw: () => {
                 frameCount++;
-                if (frameCount === 1) {
-                    loop();  // Resume after first draw
+                if (!noLoopCalled) {
+                    noLoopCalled = true;
+                    noLoop();
                 }
             }
         });
-        
+
         let framesReceived = 0;
-        p5b.on("frame", (buffer) => {
-            framesReceived++;
-        });
-        
+        p5b.on("frame", () => { framesReceived++; });
+
+        // After noLoop stops the animation, resume it externally
+        setTimeout(() => { loop(); }, 100);
+
         setTimeout(() => {
             expect(framesReceived).toBeGreaterThan(1);  // Should resume after loop()
             p5b.stop();
             done();
         }, 500);
+
+        p5b.run();
     });
     
     it("should initially report isLooping as true", (done) => {
+        let loopingOnFirstFrame;
         const p5b = new P5b({
             width: 16, height: 16,
             fps: 30,
@@ -1220,18 +1220,18 @@ describe("P5b Integration - Loop Control", () => {
             draw: () => {
                 // First frame - isLooping should be true
                 if (frameCount === 1) {
-                    global.results.initialLooping = isLooping();
+                    loopingOnFirstFrame = isLooping();
                     noLoop();
                 }
             }
         });
-        
-        p5b.on("frame", (buffer) => {
-            expect(global.results.initialLooping).toBe(true);
+
+        p5b.on("frame", () => {
+            expect(loopingOnFirstFrame).toBe(true);
             p5b.stop();
             done();
         });
-        
+
         p5b.run();
     });
 });

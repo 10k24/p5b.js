@@ -126,6 +126,9 @@ class P5b extends EventEmitter {
     }
 
     _loadP5() {
+        global.performance = {
+            now: () => Date.now()
+        };
         return require("p5").default || require("p5");
     }
 
