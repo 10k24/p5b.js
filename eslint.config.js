@@ -75,6 +75,7 @@ module.exports = [
                 accelerationY: "readonly",
                 accelerationZ: "readonly",
                 loadImage: "readonly",
+                noLoop: "readonly",
                 path: "readonly"
             }
         },
