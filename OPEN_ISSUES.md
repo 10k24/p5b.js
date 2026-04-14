@@ -23,17 +23,6 @@ This document lists features from p5.js that are not implemented or incomplete i
 
 ## High Priority
 
-### Binding global variables (declared outside a function)
-
-e.g.
-
-```js
-let hello = "I am undefined in global scope";
-function preload() {}
-function setup() {}
-function draw() {}
-```
-
 ### Time Functions
 
 | Function | Description |
@@ -107,6 +96,41 @@ function draw() {}
 ---
 
 ## Low Priority
+
+### Allow passing global scope code
+
+e.g. A normal sketch might be like this
+
+```js
+let font;
+function preload() {
+    font = loadFont("path");
+}
+function setup() {}
+function draw() {
+    textFont(font)
+    // etc
+}
+```
+
+But via p5b config, we may want to support the following
+
+```
+const config = {
+    global: () => {
+        let font;
+    },
+    preload: () => {
+        font = loadFont("path");
+    },
+    setup: () => {},
+    draw: () => {
+        textFont(font)
+        // etc
+    }
+}
+```
+
 
 ### Environment (Low)
 

@@ -306,8 +306,8 @@ describe("P5b Real Sketch - global sketch", () => {
             done(err.error);
         });
         p5b.on("frame", (buffer) => {
-            expect(global.hello).toBe("I am a global variable");
-            expect(global.count).toBe(42);
+            expect(global.found_hello).toBe("I am a global variable");
+            expect(global.found_count).toBe(42);
             p5b.stop();
             done();
         });

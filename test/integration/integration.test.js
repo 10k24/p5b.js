@@ -1020,3 +1020,49 @@ describe("P5b Integration - WEBGL Mode", () => {
         p5b.run();
     });
 });
+
+describe("P5b Integration - Time Functions", () => {
+    it("should return current time values matching native Date", (done) => {
+        const now = new Date();
+        
+        const p5b = new P5b({
+            width: 16, height: 16,
+            fps: 30,
+            setup: () => {
+                createCanvas(100, 100);
+            },
+            draw: () => {
+                const results = global.results = {};
+                results.year = year();
+                results.month = month();
+                results.day = day();
+                results.hour = hour();
+                results.minute = minute();
+                results.second = second();
+                results.millis = millis();
+                noLoop();
+            }
+        });
+        
+        p5b.on("error", (err) => {
+            p5b.stop();
+            done(err.error);
+        });
+        
+        p5b.on("frame", (buffer) => {
+            expect(global.results.year).toBe(now.getFullYear());
+            expect(global.results.month).toBe(now.getMonth() + 1);
+            expect(global.results.day).toBe(now.getDate());
+            expect(global.results.hour).toBe(now.getHours());
+            // Relaxed test for minute/second due to timing gap
+            expect(Math.abs(global.results.minute - now.getMinutes())).toBeLessThanOrEqual(1);
+            expect(Math.abs(global.results.second - now.getSeconds())).toBeLessThanOrEqual(2);
+            expect(global.results.millis).toBeGreaterThanOrEqual(0);
+            expect(global.results.millis).toBeLessThanOrEqual(999);
+            p5b.stop();
+            done();
+        });
+        
+        p5b.run();
+    });
+});
