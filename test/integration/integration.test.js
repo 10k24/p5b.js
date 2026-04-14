@@ -3,6 +3,9 @@ const { describe, it, expect } = require("bun:test");
 const path = require("path");
 const { P5b } = require("../../p5b");
 
+// TODO: build out more utils like this for brevity
+const doneErr = (err) => { p5b.stop(); done(err.error); };
+
 describe("P5b Integration - Buffer Analysis", () => {
     function testBackgroundColorScenarios(done) {
         const scenarios = [
@@ -782,10 +785,7 @@ describe("P5b Integration - loadImage", () => {
             }
         });
 
-        p5b.on("error", (err) => {
-            p5b.stop();
-            done(err.error);
-        });
+        p5b.on("error", doneErr);
 
         p5b.on("frame", (buffer) => {
             expect(buffer).toBeInstanceOf(Uint8Array);
@@ -849,10 +849,7 @@ describe("P5b Integration - loadImage", () => {
             }
         });
 
-        p5b.on("error", (err) => {
-            p5b.stop();
-            done(err.error);
-        });
+        p5b.on("error", doneErr);
 
         p5b.on("frame", (buffer) => {
             expect(buffer).toBeInstanceOf(Uint8Array);
@@ -1043,11 +1040,8 @@ describe("P5b Integration - Time Functions", () => {
                 noLoop();
             }
         });
-        
-        p5b.on("error", (err) => {
-            p5b.stop();
-            done(err.error);
-        });
+
+        p5b.on("error", doneErr);
         
         p5b.on("frame", (buffer) => {
             expect(global.results.year).toBe(now.getFullYear());
@@ -1104,6 +1098,136 @@ describe("P5b Integration - Environment Functions", () => {
         
         p5b.on("frame", (buffer) => {
             expect(global.results.isLooping).toBe(false);
+            p5b.stop();
+            done();
+        });
+        
+        p5b.run();
+    });
+});
+
+describe("P5b Integration - Loop Control", () => {
+    it("should emit frames continuously when looping", (done) => {
+        let frameCount = 0;
+        const p5b = new P5b({
+            width: 16, height: 16,
+            fps: 30,
+            setup: () => { createCanvas(100, 100); },
+            draw: () => { frameCount++; }
+        });
+        
+        p5b.on("frame", (buffer) => {
+            // Should get multiple frames before timeout
+            if (frameCount >= 3) {
+                expect(frameCount).toBeGreaterThanOrEqual(3);
+                p5b.stop();
+                done();
+            }
+        });
+        
+        p5b.run();
+    });
+    
+    it("should stop emitting frames after noLoop() in setup", (done) => {
+        let frameCount = 0;
+        let isLooping;
+        const p5b = new P5b({
+            width: 16, height: 16,
+            fps: 30,
+            setup: () => { 
+                createCanvas(100, 100); 
+                noLoop();
+            },
+            draw: () => {
+                isLooping = isLooping();
+                frameCount++;
+            }
+        });
+        
+        p5b.on("frame", (buffer) => {
+            frameCount++;
+        });
+        
+        setTimeout(() => {
+            expect(isLooping).toBe(true);
+            // Should only get ONE frame (setup execution), not continuous
+            expect(frameCount).toBe(0);
+            p5b.stop();
+            done();
+        }, 500);
+    });
+    
+    it("should emit exactly one frame when noLoop called in draw", (done) => {
+        let frameCount = 0;
+        const p5b = new P5b({
+            width: 16, height: 16,
+            fps: 30,
+            setup: () => { createCanvas(100, 100); },
+            draw: () => { 
+                frameCount++;
+                if (frameCount === 1) {
+                    noLoop();
+                }
+            }
+        });
+        
+        let framesReceived = 0;
+        p5b.on("frame", (buffer) => {
+            framesReceived++;
+        });
+        
+        setTimeout(() => {
+            expect(framesReceived).toBe(1);  // Only first frame
+            p5b.stop();
+            done();
+        }, 500);
+    });
+    
+    it("should resume frame emission after loop() called", (done) => {
+        let frameCount = 0;
+        const p5b = new P5b({
+            width: 16, height: 16,
+            fps: 30,
+            setup: () => { 
+                createCanvas(100, 100); 
+                noLoop();
+            },
+            draw: () => { 
+                frameCount++;
+                if (frameCount === 1) {
+                    loop();  // Resume after first draw
+                }
+            }
+        });
+        
+        let framesReceived = 0;
+        p5b.on("frame", (buffer) => {
+            framesReceived++;
+        });
+        
+        setTimeout(() => {
+            expect(framesReceived).toBeGreaterThan(1);  // Should resume after loop()
+            p5b.stop();
+            done();
+        }, 500);
+    });
+    
+    it("should initially report isLooping as true", (done) => {
+        const p5b = new P5b({
+            width: 16, height: 16,
+            fps: 30,
+            setup: () => { createCanvas(100, 100); },
+            draw: () => {
+                // First frame - isLooping should be true
+                if (frameCount === 1) {
+                    global.results.initialLooping = isLooping();
+                    noLoop();
+                }
+            }
+        });
+        
+        p5b.on("frame", (buffer) => {
+            expect(global.results.initialLooping).toBe(true);
             p5b.stop();
             done();
         });

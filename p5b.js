@@ -152,6 +152,11 @@ class P5b extends EventEmitter {
 
         this._myP5.draw = () => {
             try {
+                // if noLoop() is called, always draw at least one frame
+                if (this._metrics.framesDrawn > 0 && !this._myP5.isLooping()) {
+                    return;
+                }
+
                 const elemsBefore = this._myP5._elements.length;
                 global.draw();
 
