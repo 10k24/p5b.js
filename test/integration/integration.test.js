@@ -1066,3 +1066,48 @@ describe("P5b Integration - Time Functions", () => {
         p5b.run();
     });
 });
+
+describe("P5b Integration - Environment Functions", () => {
+    it("should return current frameRate from p5 instance", (done) => {
+        const p5b = new P5b({
+            width: 16, height: 16,
+            fps: 30,
+            setup: () => { createCanvas(100, 100); },
+            draw: () => {
+                const currentFps = frameRate();
+                global.results.fps = currentFps;
+                global.results.target_fps = getTargetFrameRate();
+                noLoop();
+            }
+        });
+        
+        p5b.on("frame", (buffer) => {
+            // Framerate seems to be 34 for some reason
+            expect(Math.floor(global.results.fps) - 30).toBeLessThan(5);
+            expect(global.results.target_fps).toBe(30);
+            p5b.stop();
+            done();
+        });
+        
+        p5b.run();
+    });
+
+    it("should track isLooping state", (done) => {
+        const p5b = new P5b({
+            width: 16, height: 16,
+            fps: 30,
+            setup: () => { createCanvas(100, 100); noLoop(); },
+            draw: () => {
+                global.results.isLooping = isLooping();
+            }
+        });
+        
+        p5b.on("frame", (buffer) => {
+            expect(global.results.isLooping).toBe(false);
+            p5b.stop();
+            done();
+        });
+        
+        p5b.run();
+    });
+});

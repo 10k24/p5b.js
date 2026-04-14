@@ -471,6 +471,8 @@ class P5b extends EventEmitter {
         global.touchStarted = noop;
         global.touchEnded = noop;
         global.touchMoved = noop;
+        global.cursor = noop;
+        global.noCursor = noop;
         
         // Mouse/keyboard properties - all zero in headless
         global.mouseX = 0;
