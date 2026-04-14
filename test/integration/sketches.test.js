@@ -1,9 +1,9 @@
-/* eslint-disable no-undef */
+ 
 const { describe, it, expect } = require("bun:test");
 const path = require("path");
 const { P5b } = require("../../p5b");
 
-const sketchesDir = path.join(__dirname, "../fixtures/sketches");
+const sketchesDir = path.join(process.cwd(), "test/fixtures/sketches");
 
 describe("P5b Real Sketch - Shapes", () => {
     it("should render shapes sketch successfully", (done) => {

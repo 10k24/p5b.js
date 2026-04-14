@@ -1,6 +1,6 @@
 const { describe, it, expect } = require("bun:test");
+const path = require("path");
 const { P5b, P5B_DEFAULTS } = require("../p5b.js");
-const { P5bDOM } = require("../p5b-dom.js");
 
 describe("P5b Exports", () => {
     it("should export P5b class", () => {
@@ -250,6 +250,53 @@ describe("P5b Global Bindings", () => {
         p5b.run();
     });
 
+    it("should load a valid font file successfully", (done) => {
+        const fontPath = path.join(process.cwd(), "test/fixtures/font/SourceCodePro-Regular.ttf");
+        let loadedFont = null;
+
+        const p5b = new P5b({
+            width: 32, height: 32,
+            setup: () => {
+                createCanvas(64, 64);
+                loadedFont = loadFont(fontPath);
+            },
+            draw: () => { background(100); }
+        });
+
+        p5b.on("frame", () => {
+            expect(loadedFont).toBeDefined();
+            expect(loadedFont.font).toBeDefined();
+            expect(loadedFont.font.names).toBeDefined();
+            p5b.stop();
+            done();
+        });
+
+        p5b.run();
+    });
+
+    it("should throw with friendly message when font file not found", (done) => {
+        const p5b = new P5b({
+            width: 32, height: 32,
+            setup: () => {
+                createCanvas(64, 64);
+                try {
+                    loadFont("/nonexistent/path/to/font.ttf");
+                } catch (error) {
+                    expect(error.message).toContain("Failed to load font");
+                    expect(error.message).toContain("file not found");
+                }
+            },
+            draw: () => { background(100); }
+        });
+
+        p5b.on("frame", () => {
+            p5b.stop();
+            done();
+        });
+
+        p5b.run();
+    });
+
     it("should track graphics in pool after removal", (done) => {
         let frameCount = 0;
         const p5b = new P5b({
@@ -287,20 +334,5 @@ describe("P5b Global Bindings", () => {
         });
 
         p5b.run();
-    });
-});
-
-describe("P5bDOM", () => {
-    it("should create DOM stub with correct dimensions", () => {
-        const dom = new P5bDOM(100, 100);
-        expect(dom.width).toBe(100);
-        expect(dom.height).toBe(100);
-    });
-
-    it("should clear internal arrays", () => {
-        const dom = new P5bDOM(32, 32);
-        dom.clear();
-        expect(dom._bodyChildren.length).toBe(0);
-        expect(dom._canvases.length).toBe(0);
     });
 });

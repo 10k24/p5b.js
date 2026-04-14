@@ -45,7 +45,13 @@ class P5b extends EventEmitter {
             this._initSketch();
         };
 
-        new (this._loadP5())(sketch);
+        try {
+            new (this._loadP5())(sketch);
+        } catch (error) {
+            this._myP5 = null;
+            this._emitRuntimeError(error, "setup");
+            this._dom.clear();
+        }
     }
 
     stop() {
@@ -57,13 +63,30 @@ class P5b extends EventEmitter {
         this._gfxActive = [];
     }
 
+    _cleanupGlobals() {
+        delete global.window;
+        delete global.document;
+        delete global.screen;
+        if (Object.getOwnPropertyDescriptor(global, "navigator")) {
+            delete global.navigator;
+        }
+        delete global.HTMLCanvasElement;
+        delete global.ImageData;
+        delete global.requestAnimationFrame;
+        delete global.cancelAnimationFrame;
+        delete global.Event;
+        delete global.MouseEvent;
+    }
+
     toFrame() {
         const srcCanvas = this._myP5?.canvas;
         if (!srcCanvas) {
             throw new Error("Canvas not initialized. Call run() first.");
         }
 
-        if (!this._destCanvas) {
+        // Canvas resizing only happens if sketch code manually resizes,
+        // the performance and memory impact here should be negligible if not zero.
+        if (!this._destCanvas || this._destCanvas.width !== this.width || this._destCanvas.height !== this.height) {
             this._destCanvas = canvas.createCanvas(this.width, this.height);
         }
 
@@ -188,7 +211,15 @@ class P5b extends EventEmitter {
         global.loadFont = (function(that) {
             return function(fontPath) {
                 const resolvedPath = global._resolveAssetPath(that.sketchPath, fontPath);
-                const fontData = fs.readFileSync(resolvedPath);
+                let fontData;
+                try {
+                    fontData = fs.readFileSync(resolvedPath);
+                } catch (error) {
+                    if (error.code === "ENOENT") {
+                        throw new Error(`Failed to load font: file not found at ${resolvedPath}`);
+                    }
+                    throw new Error(`Failed to load font: ${error.message}`);
+                }
                 const parsedFont = opentype.parse(
                     fontData.buffer.slice(fontData.byteOffset, fontData.byteOffset + fontData.byteLength)
                 );
@@ -328,6 +359,35 @@ class P5b extends EventEmitter {
         global.accelerationX = 0;
         global.accelerationY = 0;
         global.accelerationZ = 0;
+
+        // Audio functions - noop in headless environment (p5.sound)
+        global.loadSound = noop;
+        global.loadAudio = noop;
+        global.createAudio = noop;
+        global.getAudioContext = noop;
+        global.userStartAudio = noop;
+        global.soundFormats = noop;
+
+        global.windowResized = (function(that, wr) {
+            return function() {
+                that._dom.resize(that.width, that.height);
+                that._destCanvas = canvas.createCanvas(that.width, that.height);
+                if (typeof that.windowResized === "function") {
+                    that.windowResized();
+                }
+                if (typeof wr === "function") wr();
+            };
+        })(this, global.windowResized);
+
+        global.createCanvas = (function(cc) {
+            return function(w, h, renderer) {
+                const r = renderer === undefined ? "" : String(renderer);
+                if (r.toLowerCase() === "webgl") {
+                    throw new Error("WEBGL mode is not supported in p5b. Use P2D or omit the renderer.");
+                }
+                return cc(w, h, renderer);
+            };
+        })(global.createCanvas);
     }
 
     _emitRuntimeError(error, phase) {

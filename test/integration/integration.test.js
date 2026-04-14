@@ -368,7 +368,7 @@ describe("P5b Integration - Buffer Analysis", () => {
     });
 
     it("should load fixture sketch and assert background color", (done) => {
-        const sketchPath = path.resolve(__dirname, "../fixtures/sketches/shapes.js");
+        const sketchPath = path.resolve(process.cwd(), "test/fixtures/sketches/shapes.js");
         const WIDTH = 32;
         const HEIGHT = 32;
         const p5b = new P5b({
@@ -763,7 +763,7 @@ describe("P5b Graphics Pooling - Integration", () => {
 
 describe("P5b Integration - loadImage", () => {
     it("should load image in preload and render in draw", (done) => {
-        const testImagePath = path.join(__dirname, "../fixtures/img/natalie-kinnear-CC2Bfvk2-tU-unsplash.jpg");
+        const testImagePath = path.join(process.cwd(), "test/fixtures/img/natalie-kinnear-CC2Bfvk2-tU-unsplash.jpg");
         let loadedImg = null;
 
         const p5b = new P5b({
@@ -830,7 +830,7 @@ describe("P5b Integration - loadImage", () => {
     });
 
     it("should scale image when drawing with different dimensions", (done) => {
-        const testImagePath = path.join(__dirname, "../fixtures/img/natalie-kinnear-CC2Bfvk2-tU-unsplash.jpg");
+        const testImagePath = path.join(process.cwd(), "test/fixtures/img/natalie-kinnear-CC2Bfvk2-tU-unsplash.jpg");
         let loadedImg = null;
 
         const p5b = new P5b({
@@ -936,6 +936,83 @@ describe("P5b Integration - loadImage", () => {
             expect(px(40, 49)).toEqual([0, 0, 0, 0]);
             expect(px(119, 49)).toEqual([0, 0, 0, 0]);
 
+            p5b.stop();
+            done();
+        });
+
+        p5b.run();
+    });
+});
+
+describe("P5b Integration - windowResized", () => {
+    it("should call user-defined windowResized handler", (done) => {
+        let windowResizedCalled = false;
+
+        const p5b = new P5b({
+            width: 32, height: 32,
+            fps: 30,
+            setup: () => {
+                createCanvas(100, 100);
+            },
+            draw: () => {
+                background(100);
+            },
+            windowResized: () => {
+                windowResizedCalled = true;
+            }
+        });
+
+        p5b.on("frame", (buffer) => {
+            windowResized();
+            expect(windowResizedCalled).toBe(true);
+            p5b.stop();
+            done();
+        });
+
+        p5b.run();
+    });
+
+    it("should update DOM dimensions after windowResized", (done) => {
+        const p5b = new P5b({
+            width: 32, height: 32,
+            fps: 30,
+            setup: () => {
+                createCanvas(100, 100);
+            },
+            draw: () => {
+                background(100);
+            }
+        });
+
+        p5b.on("frame", () => {
+            windowResized();
+            const domAfter = p5b._dom;
+            expect(domAfter.width).toBe(32);
+            expect(domAfter.height).toBe(32);
+            p5b.stop();
+            done();
+        });
+
+        p5b.run();
+    });
+});
+
+describe("P5b Integration - WEBGL Mode", () => {
+    it("should emit error when WEBGL mode is requested", (done) => {
+        const p5b = new P5b({
+            width: 32, height: 32,
+            fps: 30,
+            setup: () => {
+                createCanvas(100, 100, WEBGL);
+            },
+            draw: () => {
+                background(100);
+            }
+        });
+
+        p5b.on("error", (err) => {
+            expect(err.phase).toBeDefined();
+            expect(err.error).toBeDefined();
             p5b.stop();
             done();
         });

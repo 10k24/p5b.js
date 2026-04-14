@@ -29,6 +29,14 @@ class P5bDOM {
         this._canvases.length = 0;
     }
 
+    resize(newWidth, newHeight) {
+        this.width = newWidth;
+        this.height = newHeight;
+        this._bodyChildren.length = 0;
+        this._canvases.length = 0;
+        this._init();
+    }
+
     _init() {
         const bodyChildren = this._bodyChildren;
         const allCanvases = this._canvases;

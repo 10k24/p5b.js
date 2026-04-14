@@ -74,7 +74,8 @@ module.exports = [
                 accelerationX: "readonly",
                 accelerationY: "readonly",
                 accelerationZ: "readonly",
-                loadImage: "readonly"
+                loadImage: "readonly",
+                path: "readonly"
             }
         },
         rules: {
