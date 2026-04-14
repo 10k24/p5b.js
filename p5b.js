@@ -8,6 +8,7 @@ const { P5bDOM } = require("./p5b-dom");
 
 const noop = () => {};
 
+// TODO: function? for any global functions to exec outside of preload/setup/draw?
 const P5B_DEFAULTS = {
     sketchPath: null,
     width: 32,
@@ -64,6 +65,7 @@ class P5b extends EventEmitter {
     }
 
     _cleanupGlobals() {
+        // TODO: audit these, may need more/less removals
         delete global.window;
         delete global.document;
         delete global.screen;

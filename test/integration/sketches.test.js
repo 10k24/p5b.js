@@ -1,4 +1,4 @@
- 
+
 const { describe, it, expect } = require("bun:test");
 const path = require("path");
 const { P5b } = require("../../p5b");
@@ -289,6 +289,29 @@ describe("P5b Real Sketch - Globals", () => {
             p5b.stop();
             done();
         });
+        p5b.run();
+    });
+});
+
+describe("P5b Real Sketch - global sketch", () => {
+    it("should verify global scope variables are bound in sketch", (done) => {
+        const p5b = new P5b({
+            sketchPath: path.join(sketchesDir, "global-scope.js"),
+            width: 16,
+            height: 16,
+            fps: 30
+        });
+        p5b.on("error", (err) => {
+            p5b.stop();
+            done(err.error);
+        });
+        p5b.on("frame", (buffer) => {
+            expect(global.hello).toBe("I am a global variable");
+            expect(global.count).toBe(42);
+            p5b.stop();
+            done();
+        });
+
         p5b.run();
     });
 });
