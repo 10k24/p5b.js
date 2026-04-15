@@ -2269,3 +2269,390 @@ describe("P5b Integration - Accessibility", () => {
         p5b.run();
     });
 });
+
+describe("P5b Integration - loadFont", () => {
+    const fontPath = path.resolve(process.cwd(), "test/fixtures/font/SourceCodePro-Regular.ttf");
+
+    it("loadFont() in preload returns a p5.Font object", (done) => {
+        let font;
+        const p5b = new P5b({
+            width: 100, height: 100, fps: 30,
+            preload: () => { font = loadFont(fontPath); },
+            setup: () => { createCanvas(100, 100); },
+            draw: () => { noLoop(); }
+        });
+        p5b.on("error", (e) => { p5b.stop(); done(e.error); });
+        p5b.on("frame", () => {
+            expect(font).toBeDefined();
+            expect(typeof font).toBe("object");
+            expect(font.font).toBeDefined(); // opentype.js font object
+            p5b.stop();
+            done();
+        });
+        p5b.run();
+    });
+
+    it("loadFont() allows textFont() to change rendering", (done) => {
+        let font;
+        const p5b = new P5b({
+            width: 100, height: 100, fps: 30,
+            preload: () => { font = loadFont(fontPath); },
+            setup: () => { createCanvas(100, 100); },
+            draw: () => {
+                textFont(font);
+                textSize(20);
+                global._tw = textWidth("Hello");
+                noLoop();
+            }
+        });
+        p5b.on("error", (e) => { p5b.stop(); done(e.error); });
+        p5b.on("frame", () => {
+            expect(global._tw).toBeGreaterThan(0);
+            p5b.stop();
+            done();
+        });
+        p5b.run();
+    });
+
+    it("loadFont() throws on missing file", (done) => {
+        const p5b = new P5b({
+            width: 16, height: 16, fps: 30,
+            preload: () => { loadFont("does-not-exist.ttf"); },
+            setup: () => { createCanvas(16, 16); },
+            draw: () => { noLoop(); }
+        });
+        p5b.on("error", (e) => {
+            expect(e.error.message).toMatch(/Failed to load font/);
+            p5b.stop();
+            done();
+        });
+        p5b.run();
+    });
+});
+
+describe("P5b Integration - push/pop", () => {
+    it("push() and pop() restore fill color", (done) => {
+        const p5b = new P5b({
+            width: 100, height: 100, fps: 60,
+            setup: () => { createCanvas(100, 100); },
+            draw: () => {
+                background(0);
+                fill(255, 0, 0);
+                push();
+                fill(0, 0, 255);
+                rect(0, 0, 40, 40);  // blue rect
+                pop();
+                rect(60, 60, 40, 40); // should be red (fill restored)
+                noLoop();
+            }
+        });
+        p5b.on("error", (e) => { p5b.stop(); done(e.error); });
+        p5b.on("frame", (buffer) => {
+            const px = (x, y) => { const i = (y * 100 + x) * 4; return [buffer[i], buffer[i+1], buffer[i+2]]; };
+            expect(px(20, 20)).toEqual([0, 0, 255]);   // blue rect
+            expect(px(80, 80)).toEqual([255, 0, 0]);   // red rect (fill restored by pop)
+            p5b.stop();
+            done();
+        });
+        p5b.run();
+    });
+
+    it("push() and pop() restore stroke weight", (done) => {
+        const p5b = new P5b({
+            width: 100, height: 100, fps: 60,
+            setup: () => { createCanvas(100, 100); },
+            draw: () => {
+                background(0);
+                strokeWeight(1);
+                push();
+                strokeWeight(20);
+                pop();
+                // After pop, strokeWeight should be back to 1
+                global._sw = drawingContext.lineWidth;
+                noLoop();
+            }
+        });
+        p5b.on("error", (e) => { p5b.stop(); done(e.error); });
+        p5b.on("frame", () => {
+            expect(global._sw).toBe(1);
+            p5b.stop();
+            done();
+        });
+        p5b.run();
+    });
+
+    it("nested push/pop restores state correctly", (done) => {
+        const p5b = new P5b({
+            width: 100, height: 100, fps: 60,
+            setup: () => { createCanvas(100, 100); },
+            draw: () => {
+                background(0);
+                fill(255, 0, 0);
+                push();
+                fill(0, 255, 0);
+                push();
+                fill(0, 0, 255);
+                rect(10, 10, 20, 20); // blue
+                pop();
+                rect(40, 40, 20, 20); // green
+                pop();
+                rect(70, 70, 20, 20); // red
+                noLoop();
+            }
+        });
+        p5b.on("error", (e) => { p5b.stop(); done(e.error); });
+        p5b.on("frame", (buffer) => {
+            const px = (x, y) => { const i = (y * 100 + x) * 4; return [buffer[i], buffer[i+1], buffer[i+2]]; };
+            expect(px(20, 20)).toEqual([0, 0, 255]);
+            expect(px(50, 50)).toEqual([0, 255, 0]);
+            expect(px(80, 80)).toEqual([255, 0, 0]);
+            p5b.stop();
+            done();
+        });
+        p5b.run();
+    });
+});
+
+describe("P5b Integration - Transforms", () => {
+    it("translate() shifts drawing origin", (done) => {
+        const p5b = new P5b({
+            width: 100, height: 100, fps: 60,
+            setup: () => { createCanvas(100, 100); },
+            draw: () => {
+                background(0);
+                fill(255, 0, 0); noStroke();
+                translate(30, 30);
+                rect(0, 0, 20, 20); // drawn at (30,30)-(50,50) in screen space
+                noLoop();
+            }
+        });
+        p5b.on("error", (e) => { p5b.stop(); done(e.error); });
+        p5b.on("frame", (buffer) => {
+            const px = (x, y) => { const i = (y * 100 + x) * 4; return [buffer[i], buffer[i+1], buffer[i+2]]; };
+            expect(px(40, 40)).toEqual([255, 0, 0]); // inside translated rect
+            expect(px(10, 10)).toEqual([0, 0, 0]);   // origin, no rect here
+            p5b.stop();
+            done();
+        });
+        p5b.run();
+    });
+
+    it("rotate() rotates the coordinate system", (done) => {
+        // Draw a rect without and with rotation — buffers should differ
+        let noRotBuffer;
+        let drawCall = 0;
+        const p5b = new P5b({
+            width: 100, height: 100, fps: 60,
+            setup: () => { createCanvas(100, 100); },
+            draw: () => {
+                drawCall++;
+                background(0);
+                fill(255, 0, 0); noStroke();
+                translate(50, 50);
+                if (drawCall === 1) {
+                    rect(0, 0, 30, 10);
+                } else {
+                    rotate(PI / 2);
+                    rect(0, 0, 30, 10);
+                    noLoop();
+                }
+            }
+        });
+        p5b.on("error", (e) => { p5b.stop(); done(e.error); });
+        p5b.on("frame", (buffer) => {
+            if (drawCall === 1) {
+                noRotBuffer = Buffer.from(buffer);
+            } else {
+                expect(Buffer.from(buffer).equals(noRotBuffer)).toBe(false);
+                p5b.stop();
+                done();
+            }
+        });
+        p5b.run();
+    });
+
+    it("scale() scales the coordinate system", (done) => {
+        // Draw same rect with scale(2) — covers more pixels than without
+        let normalBuffer;
+        let drawCall = 0;
+        const p5b = new P5b({
+            width: 100, height: 100, fps: 60,
+            setup: () => { createCanvas(100, 100); },
+            draw: () => {
+                drawCall++;
+                background(0);
+                fill(255, 0, 0); noStroke();
+                if (drawCall === 1) {
+                    rect(10, 10, 20, 20);
+                } else {
+                    scale(2);
+                    rect(10, 10, 20, 20);
+                    noLoop();
+                }
+            }
+        });
+        p5b.on("error", (e) => { p5b.stop(); done(e.error); });
+        p5b.on("frame", (buffer) => {
+            if (drawCall === 1) {
+                normalBuffer = Buffer.from(buffer);
+            } else {
+                expect(Buffer.from(buffer).equals(normalBuffer)).toBe(false);
+                p5b.stop();
+                done();
+            }
+        });
+        p5b.run();
+    });
+
+    it("push/pop wraps transforms correctly", (done) => {
+        const p5b = new P5b({
+            width: 100, height: 100, fps: 60,
+            setup: () => { createCanvas(100, 100); },
+            draw: () => {
+                background(0);
+                fill(255, 0, 0); noStroke();
+                push();
+                translate(50, 50);
+                rect(0, 0, 20, 20); // at (50,50)
+                pop();
+                rect(0, 0, 20, 20); // back at (0,0)
+                noLoop();
+            }
+        });
+        p5b.on("error", (e) => { p5b.stop(); done(e.error); });
+        p5b.on("frame", (buffer) => {
+            const px = (x, y) => { const i = (y * 100 + x) * 4; return [buffer[i], buffer[i+1], buffer[i+2]]; };
+            expect(px(10, 10)).toEqual([255, 0, 0]); // rect at origin
+            expect(px(60, 60)).toEqual([255, 0, 0]); // rect at translated origin
+            p5b.stop();
+            done();
+        });
+        p5b.run();
+    });
+});
+
+describe("P5b Integration - colorMode", () => {
+    it("colorMode(HSB) allows HSB color specification", (done) => {
+        const p5b = new P5b({
+            width: 100, height: 100, fps: 60,
+            setup: () => { createCanvas(100, 100); },
+            draw: () => {
+                background(0);
+                colorMode(HSB);
+                fill(0, 100, 100); // pure red in HSB
+                noStroke();
+                rect(20, 20, 60, 60);
+                noLoop();
+            }
+        });
+        p5b.on("error", (e) => { p5b.stop(); done(e.error); });
+        p5b.on("frame", (buffer) => {
+            const px = (x, y) => { const i = (y * 100 + x) * 4; return [buffer[i], buffer[i+1], buffer[i+2]]; };
+            const [r, g, b] = px(50, 50);
+            expect(r).toBeGreaterThan(200); // red channel high
+            expect(g).toBeLessThan(50);     // green low
+            expect(b).toBeLessThan(50);     // blue low
+            p5b.stop();
+            done();
+        });
+        p5b.run();
+    });
+
+    it("colorMode(RGB) and colorMode(HSB) produce different colors for same values", (done) => {
+        let rgbBuffer;
+        let drawCall = 0;
+        const p5b = new P5b({
+            width: 100, height: 100, fps: 60,
+            setup: () => { createCanvas(100, 100); },
+            draw: () => {
+                drawCall++;
+                background(0);
+                noStroke();
+                if (drawCall === 1) {
+                    colorMode(RGB);
+                    fill(120, 100, 100);
+                } else {
+                    colorMode(HSB);
+                    fill(120, 100, 100);
+                    noLoop();
+                }
+                rect(20, 20, 60, 60);
+            }
+        });
+        p5b.on("error", (e) => { p5b.stop(); done(e.error); });
+        p5b.on("frame", (buffer) => {
+            if (drawCall === 1) {
+                rgbBuffer = Buffer.from(buffer);
+            } else {
+                expect(Buffer.from(buffer).equals(rgbBuffer)).toBe(false);
+                p5b.stop();
+                done();
+            }
+        });
+        p5b.run();
+    });
+});
+
+describe("P5b Integration - Property Getters", () => {
+    it("frameCount increments each draw call", (done) => {
+        const counts = [];
+        const p5b = new P5b({
+            width: 16, height: 16, fps: 60,
+            setup: () => { createCanvas(16, 16); },
+            draw: () => {
+                counts.push(frameCount);
+                if (frameCount >= 3) noLoop();
+            }
+        });
+        p5b.on("error", (e) => { p5b.stop(); done(e.error); });
+        p5b.on("frame", () => {
+            if (!p5b._myP5?.isLooping()) {
+                expect(counts.length).toBeGreaterThanOrEqual(3);
+                expect(counts[0]).toBe(1);
+                expect(counts[1]).toBe(2);
+                expect(counts[2]).toBe(3);
+                p5b.stop();
+                done();
+            }
+        });
+        p5b.run();
+    });
+
+    it("width and height reflect the createCanvas dimensions", (done) => {
+        const p5b = new P5b({
+            width: 50, height: 50, fps: 30,
+            setup: () => { createCanvas(80, 60); },
+            draw: () => {
+                global._w = width;
+                global._h = height;
+                noLoop();
+            }
+        });
+        p5b.on("error", (e) => { p5b.stop(); done(e.error); });
+        p5b.on("frame", () => {
+            expect(global._w).toBe(80);
+            expect(global._h).toBe(60);
+            p5b.stop();
+            done();
+        });
+        p5b.run();
+    });
+
+    it("frameRate getter returns a number", (done) => {
+        const p5b = new P5b({
+            width: 16, height: 16, fps: 30,
+            setup: () => { createCanvas(16, 16); },
+            draw: () => {
+                global._fr = frameRate();
+                noLoop();
+            }
+        });
+        p5b.on("error", (e) => { p5b.stop(); done(e.error); });
+        p5b.on("frame", () => {
+            expect(typeof global._fr).toBe("number");
+            p5b.stop();
+            done();
+        });
+        p5b.run();
+    });
+});
