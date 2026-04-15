@@ -525,15 +525,105 @@ class P5b extends EventEmitter {
             };
         })(this, global.windowResized);
 
-        global.createCanvas = (function(cc) {
+        global.createCanvas = (function(that, cc) {
             return function(w, h, renderer) {
                 const r = renderer === undefined ? "" : String(renderer);
                 if (r.toLowerCase() === "webgl") {
                     throw new Error("WEBGL mode is not supported in p5b. Use P2D or omit the renderer.");
                 }
-                return cc(w, h, renderer);
+                const result = cc(w, h, renderer);
+                that._myP5.windowWidth = w;
+                that._myP5.windowHeight = h;
+                return result;
             };
-        })(global.createCanvas);
+        })(this, global.createCanvas);
+
+        global.loadStrings = (function(that) {
+            return function(filePath, callback, errorCallback) {
+                const p5 = that._myP5;
+                p5._incrementPreload();
+                try {
+                    const resolvedPath = global._resolveAssetPath(that.sketchPath, filePath);
+                    const content = fs.readFileSync(resolvedPath, "utf8");
+                    const lines = content
+                        .replace(/\r\n/g, "\r")
+                        .replace(/\n/g, "\r")
+                        .split(/\r/);
+                    if (lines.length > 0 && lines[lines.length - 1] === "") lines.pop();
+                    if (callback) callback(lines);
+                    setImmediate(() => p5._decrementPreload());
+                    return lines;
+                } catch (error) {
+                    setImmediate(() => p5._decrementPreload());
+                    if (errorCallback) errorCallback(error);
+                    else console.error(`Failed to load strings: ${error.message}`);
+                }
+            };
+        })(this);
+
+        global.loadTable = (function(that) {
+            return function(filePath, ...args) {
+                const p5 = that._myP5;
+                p5._incrementPreload();
+
+                // Parse variadic args: loadTable(path, [options], [header], callback, errorCallback)
+                let options = "";
+                let hasHeader = false;
+                let callback = null;
+                let errorCallback = null;
+                for (const arg of args) {
+                    if (typeof arg === "function") {
+                        if (!callback) callback = arg;
+                        else errorCallback = arg;
+                    } else if (typeof arg === "string") {
+                        if (arg === "header") hasHeader = true;
+                        else options = arg; // "csv", "tsv", "ssv"
+                    }
+                }
+
+                let separator = ",";
+                if (options === "tsv") separator = "\t";
+                else if (options === "ssv") separator = ";";
+
+                try {
+                    const resolvedPath = global._resolveAssetPath(that.sketchPath, filePath);
+                    const content = fs.readFileSync(resolvedPath, "utf8");
+                    const lines = content
+                        .replace(/\r\n/g, "\r")
+                        .replace(/\n/g, "\r")
+                        .split(/\r/)
+                        .filter(l => l.length > 0);
+
+                    const P5 = that._loadP5();
+                    const table = new P5.Table();
+
+                    let startRow = 0;
+                    if (hasHeader && lines.length > 0) {
+                        const headers = lines[0].split(separator);
+                        headers.forEach(h => table.addColumn(h.trim()));
+                        startRow = 1;
+                    }
+
+                    for (let i = startRow; i < lines.length; i++) {
+                        const cells = lines[i].split(separator);
+                        // Auto-add columns on first data row when no header was provided
+                        if (table.columns.length === 0) {
+                            cells.forEach((_, j) => table.addColumn(String(j)));
+                        }
+                        const row = table.addRow();
+                        cells.forEach((cell, j) => row.set(j, cell.trim()));
+                    }
+
+                    if (callback) callback(table);
+                    setImmediate(() => p5._decrementPreload());
+                    return table;
+                } catch (error) {
+                    setImmediate(() => p5._decrementPreload());
+                    if (errorCallback) errorCallback(error);
+                    else console.error(`Failed to load table: ${error.message}`);
+                }
+            };
+        })(this);
     }
 
     _emitRuntimeError(error, phase) {

@@ -1472,3 +1472,666 @@ describe("P5b Integration - Loop Control", () => {
         p5b.run();
     });
 });
+
+describe("P5b Integration - Mode/Style Functions", () => {
+    // Helper: render one frame on a 100x100 canvas, return pixel reader
+    function renderFrame(sketchConfig, cb) {
+        const p5b = new P5b({ width: 100, height: 100, fps: 60, ...sketchConfig });
+        p5b.on("error", (e) => { p5b.stop(); throw e.error; });
+        p5b.on("frame", (buffer) => {
+            const px = (x, y) => {
+                const i = (y * 100 + x) * 4;
+                return [buffer[i], buffer[i+1], buffer[i+2], buffer[i+3]];
+            };
+            p5b.stop();
+            cb(px);
+        });
+        p5b.run();
+    }
+
+    it("rectMode(CORNER) places rect with top-left origin", (done) => {
+        renderFrame({
+            setup: () => { createCanvas(100, 100); },
+            draw: () => {
+                background(0);
+                rectMode(CORNER);
+                fill(255, 0, 0); noStroke();
+                rect(50, 50, 20, 20);
+                noLoop();
+            }
+        }, (px) => {
+            // interior of rect should be red
+            expect(px(55, 55)).toEqual([255, 0, 0, 255]);
+            // just outside top-left corner should be black
+            expect(px(45, 45)).toEqual([0, 0, 0, 255]);
+            done();
+        });
+    });
+
+    it("rectMode(CENTER) places rect centered on x,y", (done) => {
+        renderFrame({
+            setup: () => { createCanvas(100, 100); },
+            draw: () => {
+                background(0);
+                rectMode(CENTER);
+                fill(255, 0, 0); noStroke();
+                rect(50, 50, 20, 20);
+                noLoop();
+            }
+        }, (px) => {
+            // center should be red
+            expect(px(50, 50)).toEqual([255, 0, 0, 255]);
+            // corners at 40-59 should be red
+            expect(px(41, 41)).toEqual([255, 0, 0, 255]);
+            // outside (before top-left) should be black
+            expect(px(38, 38)).toEqual([0, 0, 0, 255]);
+            done();
+        });
+    });
+
+    it("rectMode(CORNERS) interprets args as two corners", (done) => {
+        renderFrame({
+            setup: () => { createCanvas(100, 100); },
+            draw: () => {
+                background(0);
+                rectMode(CORNERS);
+                fill(255, 0, 0); noStroke();
+                rect(40, 40, 60, 60);
+                noLoop();
+            }
+        }, (px) => {
+            // inside rect
+            expect(px(45, 45)).toEqual([255, 0, 0, 255]);
+            expect(px(55, 55)).toEqual([255, 0, 0, 255]);
+            // outside rect
+            expect(px(35, 35)).toEqual([0, 0, 0, 255]);
+            done();
+        });
+    });
+
+    it("ellipseMode(CENTER) places ellipse centered on x,y", (done) => {
+        renderFrame({
+            setup: () => { createCanvas(100, 100); },
+            draw: () => {
+                background(0);
+                ellipseMode(CENTER);
+                fill(255, 0, 0); noStroke();
+                ellipse(50, 50, 20, 20);
+                noLoop();
+            }
+        }, (px) => {
+            // center red
+            expect(px(50, 50)).toEqual([255, 0, 0, 255]);
+            // far outside the 10px radius should be black
+            expect(px(62, 50)).toEqual([0, 0, 0, 255]);
+            expect(px(37, 50)).toEqual([0, 0, 0, 255]);
+            done();
+        });
+    });
+
+    it("ellipseMode(CORNER) places ellipse with top-left at x,y", (done) => {
+        // In CORNER mode, ellipse(50,40,20,20): top-left=(50,40), center=(60,50)
+        // In CENTER mode, ellipse(50,40,20,20): center=(50,40)
+        // Use a single instance, two frames, to avoid concurrent-globals race
+        let drawCall = 0;
+        let cornerPx;
+        const p5b = new P5b({
+            width: 100, height: 100, fps: 60,
+            setup: () => { createCanvas(100, 100); },
+            draw: () => {
+                drawCall++;
+                background(0);
+                if (drawCall === 1) {
+                    ellipseMode(CORNER);
+                    fill(255, 0, 0); noStroke();
+                    ellipse(50, 40, 20, 20);
+                } else {
+                    ellipseMode(CENTER);
+                    fill(255, 0, 0); noStroke();
+                    ellipse(50, 40, 20, 20);
+                    noLoop();
+                }
+            }
+        });
+        p5b.on("error", (e) => { p5b.stop(); done(e.error); });
+        p5b.on("frame", (buffer) => {
+            const px = (x, y) => {
+                const i = (y * 100 + x) * 4;
+                return [buffer[i], buffer[i+1], buffer[i+2], buffer[i+3]];
+            };
+            if (drawCall === 1) {
+                // CORNER mode: ellipse(50,40,20,20) → center=(60,50)
+                // px(65,50) is inside CORNER ellipse, outside CENTER ellipse
+                cornerPx = px(65, 50);
+            } else {
+                // CENTER mode: ellipse(50,40,20,20) → center=(50,40)
+                // px(65,50) is outside CENTER ellipse (distance ~18 > radius 10) → black
+                const centerPx = px(65, 50);
+                expect(cornerPx[0]).toBe(255); // red inside CORNER ellipse
+                expect(centerPx[0]).toBe(0);   // black outside CENTER ellipse
+                p5b.stop();
+                done();
+            }
+        });
+        p5b.run();
+    });
+
+    it("strokeCap(SQUARE) vs strokeCap(PROJECT) extend line end differently", (done) => {
+        // SQUARE (butt): caps flush with endpoints; PROJECT extends strokeWeight/2 past endpoints
+        // Run sequentially to avoid global namespace collision between instances
+        renderFrame({
+            setup: () => { createCanvas(100, 100); },
+            draw: () => {
+                background(0);
+                strokeCap(SQUARE);
+                stroke(255, 0, 0); strokeWeight(10); noFill();
+                line(30, 50, 70, 50);
+                noLoop();
+            }
+        }, (px) => {
+            // At x=28, 2px before line start (30), SQUARE cap (flush) should be black
+            const squarePx = px(28, 50);
+            renderFrame({
+                setup: () => { createCanvas(100, 100); },
+                draw: () => {
+                    background(0);
+                    strokeCap(PROJECT);
+                    stroke(255, 0, 0); strokeWeight(10); noFill();
+                    line(30, 50, 70, 50);
+                    noLoop();
+                }
+            }, (px2) => {
+                // At x=28, PROJECT extends 5px past start, so x=28 is 2px inside the cap — red
+                const projectPx = px2(28, 50);
+                expect(squarePx[0]).toBe(0);
+                expect(projectPx[0]).toBe(255);
+                done();
+            });
+        });
+    });
+
+    it("strokeJoin(MITER) extends join point further than strokeJoin(BEVEL)", (done) => {
+        // V-shape: vertex(20,20), (50,70), (80,20), strokeWeight=10
+        // MITER extends join to a sharp point below y=70; BEVEL cuts it off earlier
+        // Run sequentially to avoid global namespace collision between instances
+        renderFrame({
+            setup: () => { createCanvas(100, 100); },
+            draw: () => {
+                background(0);
+                strokeJoin(MITER);
+                stroke(255, 0, 0); strokeWeight(10); noFill();
+                beginShape();
+                vertex(20, 20);
+                vertex(50, 70);
+                vertex(80, 20);
+                endShape();
+                noLoop();
+            }
+        }, (px) => {
+            const miterPx = px(50, 73);
+            renderFrame({
+                setup: () => { createCanvas(100, 100); },
+                draw: () => {
+                    background(0);
+                    strokeJoin(BEVEL);
+                    stroke(255, 0, 0); strokeWeight(10); noFill();
+                    beginShape();
+                    vertex(20, 20);
+                    vertex(50, 70);
+                    vertex(80, 20);
+                    endShape();
+                    noLoop();
+                }
+            }, (px2) => {
+                const bevelPx = px2(50, 73);
+                // MITER and BEVEL produce different pixel layouts at the join vertex
+                expect(miterPx).not.toEqual(bevelPx);
+                done();
+            });
+        });
+    });
+});
+
+describe("P5b Integration - Typography", () => {
+    it("textWidth() returns 0 for empty string", (done) => {
+        const p5b = new P5b({
+            width: 100, height: 100, fps: 60,
+            setup: () => { createCanvas(100, 100); },
+            draw: () => {
+                textSize(20);
+                global._tw_empty = textWidth("");
+                noLoop();
+            }
+        });
+        p5b.on("frame", () => {
+            expect(global._tw_empty).toBe(0);
+            p5b.stop();
+            done();
+        });
+        p5b.run();
+    });
+
+    it("textWidth() returns positive value for non-empty string", (done) => {
+        const p5b = new P5b({
+            width: 100, height: 100, fps: 60,
+            setup: () => { createCanvas(100, 100); },
+            draw: () => {
+                textSize(20);
+                global._tw_hello = textWidth("Hello");
+                noLoop();
+            }
+        });
+        p5b.on("frame", () => {
+            expect(global._tw_hello).toBeGreaterThan(0);
+            p5b.stop();
+            done();
+        });
+        p5b.run();
+    });
+
+    it("textWidth() longer string is wider than shorter string", (done) => {
+        const p5b = new P5b({
+            width: 100, height: 100, fps: 60,
+            setup: () => { createCanvas(100, 100); },
+            draw: () => {
+                textSize(20);
+                global._tw_short = textWidth("Hi");
+                global._tw_long = textWidth("Hello World");
+                noLoop();
+            }
+        });
+        p5b.on("frame", () => {
+            expect(global._tw_long).toBeGreaterThan(global._tw_short);
+            p5b.stop();
+            done();
+        });
+        p5b.run();
+    });
+
+    it("textStyle(BOLD) produces wider glyphs than textStyle(NORMAL) with Arial", (done) => {
+        const p5b = new P5b({
+            width: 100, height: 100, fps: 60,
+            setup: () => { createCanvas(100, 100); },
+            draw: () => {
+                textFont("Arial");
+                textSize(20);
+                textStyle(NORMAL);
+                global._tw_normal = textWidth("Hello World");
+                textStyle(BOLD);
+                global._tw_bold = textWidth("Hello World");
+                noLoop();
+            }
+        });
+        p5b.on("frame", () => {
+            expect(global._tw_bold).toBeGreaterThan(global._tw_normal);
+            p5b.stop();
+            done();
+        });
+        p5b.run();
+    });
+
+    it("textStyle() getter returns the current style", (done) => {
+        const p5b = new P5b({
+            width: 100, height: 100, fps: 60,
+            setup: () => { createCanvas(100, 100); },
+            draw: () => {
+                textStyle(ITALIC);
+                global._ts = textStyle();
+                noLoop();
+            }
+        });
+        p5b.on("frame", () => {
+            expect(global._ts).toBe("italic");
+            p5b.stop();
+            done();
+        });
+        p5b.run();
+    });
+
+    it("textLeading() getter/setter round-trips", (done) => {
+        const p5b = new P5b({
+            width: 100, height: 100, fps: 60,
+            setup: () => { createCanvas(100, 100); },
+            draw: () => {
+                textLeading(30);
+                global._tl = textLeading();
+                noLoop();
+            }
+        });
+        p5b.on("frame", () => {
+            expect(global._tl).toBe(30);
+            p5b.stop();
+            done();
+        });
+        p5b.run();
+    });
+
+    it("textLeading() affects line spacing — larger leading produces different pixel layout", (done) => {
+        let smallLeadingBuffer;
+        let largeLeadingBuffer;
+        let pending = 2;
+
+        function check() {
+            if (--pending === 0) {
+                expect(smallLeadingBuffer).not.toEqual(largeLeadingBuffer);
+                done();
+            }
+        }
+
+        const p5b1 = new P5b({
+            width: 100, height: 100, fps: 60,
+            setup: () => { createCanvas(100, 100); },
+            draw: () => {
+                background(255); fill(0); textSize(12);
+                textLeading(14);
+                text("line one\nline two", 5, 20);
+                noLoop();
+            }
+        });
+        p5b1.on("frame", (buf) => {
+            smallLeadingBuffer = Buffer.from(buf);
+            p5b1.stop();
+            check();
+        });
+        p5b1.run();
+
+        const p5b2 = new P5b({
+            width: 100, height: 100, fps: 60,
+            setup: () => { createCanvas(100, 100); },
+            draw: () => {
+                background(255); fill(0); textSize(12);
+                textLeading(40);
+                text("line one\nline two", 5, 20);
+                noLoop();
+            }
+        });
+        p5b2.on("frame", (buf) => {
+            largeLeadingBuffer = Buffer.from(buf);
+            p5b2.stop();
+            check();
+        });
+        p5b2.run();
+    });
+
+    it("textAlign(LEFT) vs textAlign(RIGHT) produce different pixel layouts", (done) => {
+        // Verify LEFT and RIGHT alignment produce visually distinct output.
+        // Use a single instance, two frames, to avoid concurrent-globals race.
+        let drawCall = 0;
+        let frame1Buffer;
+        const p5b = new P5b({
+            width: 100, height: 100, fps: 60,
+            setup: () => { createCanvas(100, 100); },
+            draw: () => {
+                drawCall++;
+                if (drawCall === 1) {
+                    background(255); fill(0); textSize(20);
+                    textAlign(LEFT);
+                    text("Hello", 5, 60);
+                } else {
+                    background(255); fill(0); textSize(20);
+                    textAlign(RIGHT);
+                    text("Hello", 95, 60);
+                    noLoop();
+                }
+            }
+        });
+        p5b.on("error", (e) => { p5b.stop(); done(e.error); });
+        p5b.on("frame", (buffer) => {
+            if (drawCall === 1) {
+                frame1Buffer = Buffer.from(buffer);
+            } else {
+                // LEFT and RIGHT alignment place text at opposite ends → distinct pixel buffers
+                expect(Buffer.from(buffer).equals(frame1Buffer)).toBe(false);
+                p5b.stop();
+                done();
+            }
+        });
+        p5b.run();
+    });
+
+    it("textWrap() does not throw when called with WORD or CHAR", (done) => {
+        const p5b = new P5b({
+            width: 100, height: 100, fps: 60,
+            setup: () => { createCanvas(100, 100); },
+            draw: () => {
+                textWrap(WORD);
+                textWrap(CHAR);
+                noLoop();
+            }
+        });
+        p5b.on("error", (e) => { p5b.stop(); done(e.error); });
+        p5b.on("frame", () => { p5b.stop(); done(); });
+        p5b.run();
+    });
+});
+
+describe("P5b Integration - Data/IO", () => {
+    it("loadStrings() in preload returns array of lines", (done) => {
+        const txtPath = path.resolve(process.cwd(), "test/fixtures/data/test.txt");
+        let lines;
+
+        const p5b = new P5b({
+            width: 16, height: 16, fps: 30,
+            preload: () => {
+                lines = loadStrings(txtPath);
+            },
+            setup: () => { createCanvas(16, 16); },
+            draw: () => { noLoop(); }
+        });
+
+        p5b.on("error", (e) => { p5b.stop(); done(e.error); });
+        p5b.on("frame", () => {
+            expect(Array.isArray(lines)).toBe(true);
+            expect(lines.length).toBe(3);
+            expect(lines[0]).toBe("line one");
+            expect(lines[1]).toBe("line two");
+            expect(lines[2]).toBe("line three");
+            p5b.stop();
+            done();
+        });
+        p5b.run();
+    });
+
+    it("loadStrings() calls callback with lines array", (done) => {
+        const txtPath = path.resolve(process.cwd(), "test/fixtures/data/test.txt");
+        let callbackLines;
+
+        const p5b = new P5b({
+            width: 16, height: 16, fps: 30,
+            preload: () => {
+                loadStrings(txtPath, (ls) => { callbackLines = ls; });
+            },
+            setup: () => { createCanvas(16, 16); },
+            draw: () => { noLoop(); }
+        });
+
+        p5b.on("error", (e) => { p5b.stop(); done(e.error); });
+        p5b.on("frame", () => {
+            expect(Array.isArray(callbackLines)).toBe(true);
+            expect(callbackLines.length).toBe(3);
+            p5b.stop();
+            done();
+        });
+        p5b.run();
+    });
+
+    it("loadTable() in preload parses CSV with header row", (done) => {
+        const csvPath = path.resolve(process.cwd(), "test/fixtures/data/test.csv");
+        let table;
+
+        const p5b = new P5b({
+            width: 16, height: 16, fps: 30,
+            preload: () => {
+                table = loadTable(csvPath, "csv", "header");
+            },
+            setup: () => { createCanvas(16, 16); },
+            draw: () => { noLoop(); }
+        });
+
+        p5b.on("error", (e) => { p5b.stop(); done(e.error); });
+        p5b.on("frame", () => {
+            expect(table).toBeDefined();
+            expect(table.getRowCount()).toBe(3);
+            expect(table.getString(0, "name")).toBe("Alice");
+            expect(table.getString(1, "name")).toBe("Bob");
+            expect(table.getString(2, "name")).toBe("Carol");
+            expect(table.getString(0, "city")).toBe("New York");
+            p5b.stop();
+            done();
+        });
+        p5b.run();
+    });
+
+    it("loadTable() without header option treats first row as data", (done) => {
+        const csvPath = path.resolve(process.cwd(), "test/fixtures/data/test.csv");
+        let table;
+
+        const p5b = new P5b({
+            width: 16, height: 16, fps: 30,
+            preload: () => {
+                table = loadTable(csvPath, "csv");
+            },
+            setup: () => { createCanvas(16, 16); },
+            draw: () => { noLoop(); }
+        });
+
+        p5b.on("error", (e) => { p5b.stop(); done(e.error); });
+        p5b.on("frame", () => {
+            // All 4 lines (header + 3 data) become data rows
+            expect(table.getRowCount()).toBe(4);
+            p5b.stop();
+            done();
+        });
+        p5b.run();
+    });
+});
+
+describe("P5b Integration - Environment (Extended)", () => {
+    it("cursor() does not throw in headless environment", (done) => {
+        const p5b = new P5b({
+            width: 16, height: 16, fps: 30,
+            setup: () => { createCanvas(16, 16); },
+            draw: () => {
+                cursor(HAND);
+                cursor(ARROW);
+                cursor(CROSS);
+                noLoop();
+            }
+        });
+        p5b.on("error", (e) => { p5b.stop(); done(e.error); });
+        p5b.on("frame", () => { p5b.stop(); done(); });
+        p5b.run();
+    });
+
+    it("noCursor() does not throw in headless environment", (done) => {
+        const p5b = new P5b({
+            width: 16, height: 16, fps: 30,
+            setup: () => { createCanvas(16, 16); },
+            draw: () => { noCursor(); noLoop(); }
+        });
+        p5b.on("error", (e) => { p5b.stop(); done(e.error); });
+        p5b.on("frame", () => { p5b.stop(); done(); });
+        p5b.run();
+    });
+
+    it("pixelDensity() returns 1 in headless environment", (done) => {
+        const p5b = new P5b({
+            width: 16, height: 16, fps: 30,
+            setup: () => { createCanvas(16, 16); },
+            draw: () => {
+                global._pd = pixelDensity();
+                noLoop();
+            }
+        });
+        p5b.on("error", (e) => { p5b.stop(); done(e.error); });
+        p5b.on("frame", () => {
+            expect(global._pd).toBe(1);
+            p5b.stop();
+            done();
+        });
+        p5b.run();
+    });
+
+    it("windowWidth and windowHeight match dimensions passed to createCanvas()", (done) => {
+        const p5b = new P5b({
+            width: 200, height: 200, fps: 30,
+            setup: () => { createCanvas(150, 120); },
+            draw: () => {
+                global._ww = windowWidth;
+                global._wh = windowHeight;
+                noLoop();
+            }
+        });
+        p5b.on("error", (e) => { p5b.stop(); done(e.error); });
+        p5b.on("frame", () => {
+            expect(global._ww).toBe(150);
+            expect(global._wh).toBe(120);
+            p5b.stop();
+            done();
+        });
+        p5b.run();
+    });
+});
+
+describe("P5b Integration - Accessibility", () => {
+    it("describe() does not throw in headless environment", (done) => {
+        const p5b = new P5b({
+            width: 16, height: 16, fps: 30,
+            setup: () => { createCanvas(16, 16); },
+            draw: () => {
+                // Use global.describe explicitly to avoid shadowing by bun:test's describe
+                global.describe("A simple red square on a black background.");
+                background(0); fill(255, 0, 0); rect(4, 4, 8, 8);
+                noLoop();
+            }
+        });
+        p5b.on("error", (e) => { p5b.stop(); done(e.error); });
+        p5b.on("frame", () => { p5b.stop(); done(); });
+        p5b.run();
+    });
+
+    it("describeElement() does not throw in headless environment", (done) => {
+        const p5b = new P5b({
+            width: 16, height: 16, fps: 30,
+            setup: () => { createCanvas(16, 16); },
+            draw: () => {
+                describeElement("redSquare", "A red square.");
+                background(0); fill(255, 0, 0); rect(4, 4, 8, 8);
+                noLoop();
+            }
+        });
+        p5b.on("error", (e) => { p5b.stop(); done(e.error); });
+        p5b.on("frame", () => { p5b.stop(); done(); });
+        p5b.run();
+    });
+
+    it("textOutput() does not throw in headless environment", (done) => {
+        const p5b = new P5b({
+            width: 16, height: 16, fps: 30,
+            setup: () => { createCanvas(16, 16); },
+            draw: () => {
+                textOutput();
+                background(0);
+                noLoop();
+            }
+        });
+        p5b.on("error", (e) => { p5b.stop(); done(e.error); });
+        p5b.on("frame", () => { p5b.stop(); done(); });
+        p5b.run();
+    });
+
+    it("gridOutput() does not throw in headless environment", (done) => {
+        const p5b = new P5b({
+            width: 16, height: 16, fps: 30,
+            setup: () => { createCanvas(16, 16); },
+            draw: () => {
+                gridOutput();
+                background(0);
+                noLoop();
+            }
+        });
+        p5b.on("error", (e) => { p5b.stop(); done(e.error); });
+        p5b.on("frame", () => { p5b.stop(); done(); });
+        p5b.run();
+    });
+});
