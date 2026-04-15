@@ -466,6 +466,12 @@ class P5b extends EventEmitter {
         global.LANDSCAPE = "landscape";
         global.PORTRAIT = "portrait";
 
+        // Accessibility functions - noop in headless environment (no DOM/screen readers)
+        global.describe = noop;
+        global.describeElement = noop;
+        global.textOutput = noop;
+        global.gridOutput = noop;
+
         // File I/O functions - noop in headless environment
         global.saveCanvas = noop;
         global.saveFrames = noop;
