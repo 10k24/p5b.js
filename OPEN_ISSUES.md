@@ -23,6 +23,7 @@ The following are implemented and have passing test coverage:
 - **Environment (Extended)**: cursor(), noCursor(), pixelDensity(), windowWidth, windowHeight
 - **Accessibility**: describe(), describeElement(), textOutput(), gridOutput() (all noops in headless)
 - **imageMode()**: CORNER, CENTER, CORNERS
+- **drawingContext**: direct Canvas 2D API access after createCanvas()
 
 ---
 
@@ -32,7 +33,6 @@ The following are implemented and have passing test coverage:
 
 | Feature | Notes |
 |---------|-------|
-| `drawingContext` | Direct Canvas 2D API access — undefined after run() |
 | `global:` config option | Shared sketch-scope variables across preload/setup/draw |
 
 The `global:` config use case: sketches loaded via config (not `sketchPath`) cannot share variables across lifecycle functions without relying on `global.*` manually. A `global:` function in config would run before `preload` and inject variables into sketch scope.

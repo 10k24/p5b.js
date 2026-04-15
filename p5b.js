@@ -534,6 +534,7 @@ class P5b extends EventEmitter {
                 const result = cc(w, h, renderer);
                 that._myP5.windowWidth = w;
                 that._myP5.windowHeight = h;
+                global.drawingContext = that._myP5.drawingContext;
                 return result;
             };
         })(this, global.createCanvas);

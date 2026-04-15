@@ -2094,6 +2094,52 @@ describe("P5b Integration - Data/IO", () => {
     });
 });
 
+describe("P5b Integration - drawingContext", () => {
+    it("drawingContext is defined after createCanvas and exposes canvas 2D API", (done) => {
+        const p5b = new P5b({
+            width: 100, height: 100, fps: 60,
+            setup: () => { createCanvas(100, 100); },
+            draw: () => {
+                global._dc = drawingContext;
+                noLoop();
+            }
+        });
+        p5b.on("error", (e) => { p5b.stop(); done(e.error); });
+        p5b.on("frame", () => {
+            expect(global._dc).toBeDefined();
+            expect(typeof global._dc.fillRect).toBe("function");
+            expect(typeof global._dc.drawImage).toBe("function");
+            expect(typeof global._dc.getImageData).toBe("function");
+            p5b.stop();
+            done();
+        });
+        p5b.run();
+    });
+
+    it("drawingContext can be used to draw directly onto the canvas", (done) => {
+        const p5b = new P5b({
+            width: 100, height: 100, fps: 60,
+            setup: () => { createCanvas(100, 100); },
+            draw: () => {
+                background(0);
+                // Draw a red rectangle directly via the 2D context
+                drawingContext.fillStyle = "rgb(255, 0, 0)";
+                drawingContext.fillRect(40, 40, 20, 20);
+                noLoop();
+            }
+        });
+        p5b.on("error", (e) => { p5b.stop(); done(e.error); });
+        p5b.on("frame", (buffer) => {
+            const px = (x, y) => { const i = (y * 100 + x) * 4; return [buffer[i], buffer[i+1], buffer[i+2]]; };
+            expect(px(50, 50)).toEqual([255, 0, 0]); // inside direct-drawn rect
+            expect(px(30, 30)).toEqual([0, 0, 0]);   // outside
+            p5b.stop();
+            done();
+        });
+        p5b.run();
+    });
+});
+
 describe("P5b Integration - Environment (Extended)", () => {
     it("cursor() does not throw in headless environment", (done) => {
         const p5b = new P5b({
