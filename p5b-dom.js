@@ -41,6 +41,10 @@ class P5bDOM {
         const bodyChildren = this._bodyChildren;
         const allCanvases = this._canvases;
 
+        // Absorbs unguarded el.parentNode.removeChild(el) calls from p5.js internals
+        // when an element has no real parent (matches silent browser behavior).
+        const detachedParent = { removeChild: noop, appendChild: noop };
+
         const makeStubElement = (tag) => {
             const el = {
                 tagName: tag.toUpperCase(),
@@ -59,7 +63,7 @@ class P5bDOM {
                 setAttribute: noop,
                 getAttribute: () => null,
                 getBoundingClientRect: () => ({ left: 0, top: 0, width: 0, height: 0, right: 0, bottom: 0 }),
-                parentNode: null,
+                parentNode: detachedParent,
                 childNodes: [],
                 children: [],
                 innerHTML: "",
@@ -78,7 +82,7 @@ class P5bDOM {
             c.removeEventListener = noop;
             c.dispatchEvent = () => true;
             c.getBoundingClientRect = () => ({ left: 0, top: 0, width: c.width, height: c.height, right: c.width, bottom: c.height });
-            c.parentNode = null;
+            c.parentNode = detachedParent;
             c.style = {};
             allCanvases.push(c);
             return c;
@@ -94,7 +98,7 @@ class P5bDOM {
                 appendChild: (el) => { bodyChildren.push(el); if (el && typeof el === "object") el.parentNode = document.body; return el; },
                 removeChild: (el) => {
                     spliceFrom(bodyChildren, el);
-                    if (el && typeof el === "object") el.parentNode = null;
+                    if (el && typeof el === "object") el.parentNode = detachedParent;
                     spliceFrom(allCanvases, el);
                     return el;
                 },
