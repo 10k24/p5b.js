@@ -1,4 +1,5 @@
 const canvas = require("canvas");
+const { version } = require("./package.json");
 
 const noop = () => {};
 const spliceFrom = (arr, item) => {
@@ -141,7 +142,7 @@ class P5bDOM {
         const win = {
             document,
             screen: { width: this.width, height: this.height },
-            navigator: { userAgent: "Node.js", languages: ["en"], language: "en", userLanguage: "en", mediaDevices: null },
+            navigator: { userAgent: `p5b-dom/${version}`, languages: ["en"], language: "en", userLanguage: "en", mediaDevices: { getUserMedia: () => Promise.reject(new Error("getUserMedia not supported in headless")) } },
             addEventListener: noop,
             removeEventListener: noop,
             dispatchEvent: () => true,
@@ -165,10 +166,12 @@ class P5bDOM {
         global.document = document;
         global.screen = win.screen;
 
-        if (!Object.getOwnPropertyDescriptor(global, "navigator")) {
+        const navDesc = Object.getOwnPropertyDescriptor(global, "navigator");
+        if (!navDesc || navDesc.configurable) {
             Object.defineProperty(global, "navigator", {
                 get: () => global.window.navigator,
-                configurable: true
+                configurable: true,
+                enumerable: true,
             });
         }
         global.HTMLCanvasElement = canvas.Canvas;

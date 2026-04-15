@@ -2656,3 +2656,48 @@ describe("P5b Integration - Property Getters", () => {
         p5b.run();
     });
 });
+
+describe("P5b Integration - navigator.userAgent", () => {
+    it("userAgent contains p5b-dom and version string", (done) => {
+        let capturedUA = null;
+        const p5b = new P5b({
+            width: 16, height: 16, fps: 30,
+            setup: () => {
+                createCanvas(16, 16);
+                capturedUA = navigator.userAgent;
+            },
+            draw: () => { noLoop(); },
+        });
+        p5b.on("error", (e) => { p5b.stop(); done(e.error); });
+        p5b.on("frame", () => {
+            expect(capturedUA).toMatch(/^p5b-dom\/\d+\.\d+\.\d+$/);
+            p5b.stop();
+            done();
+        });
+        p5b.run();
+    });
+});
+
+describe("P5b Integration - toFrame loadPixels happy path", () => {
+    it("emits correct RGBA pixels when canvas matches p5b dimensions", (done) => {
+        const WIDTH = 16;
+        const HEIGHT = 16;
+        const p5b = new P5b({
+            width: WIDTH, height: HEIGHT, fps: 30,
+            setup: () => { createCanvas(WIDTH, HEIGHT); background(255, 0, 0); },
+            draw: () => { noLoop(); },
+        });
+        p5b.on("error", (e) => { p5b.stop(); done(e.error); });
+        p5b.on("frame", (pixels) => {
+            // Red background: R=255, G=0, B=0, A=255
+            expect(pixels[0]).toBe(255);
+            expect(pixels[1]).toBe(0);
+            expect(pixels[2]).toBe(0);
+            expect(pixels[3]).toBe(255);
+            expect(pixels.length).toBe(WIDTH * HEIGHT * 4);
+            p5b.stop();
+            done();
+        });
+        p5b.run();
+    });
+});

@@ -8,6 +8,17 @@ const { P5bDOM } = require("./p5b-dom");
 
 const noop = () => {};
 
+// Swap pixel data order BGRA -> RGBA
+const reorderBuffer = (buf) => {
+    const ret = new Uint8Array(buf);
+    for (let i = 0; i < ret.length; i += 4) {
+        const b = ret[i];
+        ret[i] = ret[i + 2];
+        ret[i + 2] = b;
+    }
+    return ret;
+};
+
 // TODO: function? for any global functions to exec outside of preload/setup/draw?
 const P5B_DEFAULTS = {
     sketchPath: null,
@@ -87,6 +98,13 @@ class P5b extends EventEmitter {
             throw new Error("Canvas not initialized. Call run() first.");
         }
 
+        // Happy path: canvas dimensions match p5b config — skip drawImage blit.
+        // node-canvas getImageData() (used by loadPixels) already returns RGBA, no swap needed.
+        if (srcCanvas.width === this.width && srcCanvas.height === this.height) {
+            this._myP5.loadPixels();
+            return new Uint8Array(this._myP5.pixels.buffer);
+        }
+
         // Canvas resizing only happens if sketch code manually resizes,
         // the performance and memory impact here should be negligible if not zero.
         if (!this._destCanvas || this._destCanvas.width !== this.width || this._destCanvas.height !== this.height) {
@@ -94,7 +112,7 @@ class P5b extends EventEmitter {
         }
 
         const ctx = this._destCanvas.getContext("2d");
-        
+
         // Ensure a blank canvas on all pixels when not stretching source frame
         ctx.clearRect(0, 0, this.width, this.height);
 
@@ -109,17 +127,7 @@ class P5b extends EventEmitter {
             0, 0, srcCanvas.width * scaleFactor, srcCanvas.height * scaleFactor
         );
 
-        const ret = new Uint8Array(this._destCanvas.toBuffer("raw"));
-
-        // Swap pixel data order BGRA -> RGBA
-        for (let i = 0; i < ret.length; i += 4) {
-            const swapR2B = ret[i];
-            const swapB2R = ret[i + 2];
-            ret[i] = swapB2R;
-            ret[i + 2] = swapR2B;
-        }
-
-        return ret;
+        return reorderBuffer(this._destCanvas.toBuffer("raw"));
     }
 
     getMetrics() {
