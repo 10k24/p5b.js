@@ -1473,6 +1473,94 @@ describe("P5b Integration - Loop Control", () => {
     });
 });
 
+describe("P5b Integration - imageMode", () => {
+    it("imageMode(CORNER) vs imageMode(CENTER) place the same image at different positions", (done) => {
+        // Draw 20x20 red image at coords (50,50) in two consecutive frames with different modes.
+        // CORNER: top-left at (50,50) → covers x:50-69, y:50-69. px(65,65)=red, px(45,45)=black.
+        // CENTER: centered at (50,50) → covers x:40-59, y:40-59. px(65,65)=black, px(45,45)=red.
+        // Same image, same coordinates, different modes → different pixel output proves mode takes effect.
+        let drawCall = 0;
+        let cornerPx65, cornerPx45;
+        const p5b = new P5b({
+            width: 100, height: 100, fps: 60,
+            setup: () => { createCanvas(100, 100); },
+            draw: () => {
+                drawCall++;
+                background(0);
+                const pg = createGraphics(20, 20);
+                pg.background(255, 0, 0);
+                if (drawCall === 1) {
+                    imageMode(CORNER);
+                } else {
+                    imageMode(CENTER);
+                    noLoop();
+                }
+                image(pg, 50, 50);
+            }
+        });
+        p5b.on("error", (e) => { p5b.stop(); done(e.error); });
+        p5b.on("frame", (buffer) => {
+            const px = (x, y) => { const i = (y * 100 + x) * 4; return [buffer[i], buffer[i+1], buffer[i+2]]; };
+            if (drawCall === 1) {
+                cornerPx65 = px(65, 65);
+                cornerPx45 = px(45, 45);
+            } else {
+                const centerPx65 = px(65, 65);
+                const centerPx45 = px(45, 45);
+                // CORNER: (65,65) inside image → red; CENTER: (65,65) outside image → black
+                expect(cornerPx65).toEqual([255, 0, 0]);
+                expect(centerPx65).toEqual([0, 0, 0]);
+                // CORNER: (45,45) outside image → black; CENTER: (45,45) inside image → red
+                expect(cornerPx45).toEqual([0, 0, 0]);
+                expect(centerPx45).toEqual([255, 0, 0]);
+                p5b.stop();
+                done();
+            }
+        });
+        p5b.run();
+    });
+
+    it("imageMode(CORNERS) stretches image between two corner coordinates", (done) => {
+        // CORNER (default): image(pg, 30, 30) with 20x20 image → covers x:30-49, y:30-49
+        // CORNERS: image(pg, 30, 30, 70, 70) → image stretched to fill x:30-70, y:30-70
+        // At px(60,60): outside CORNER image, inside CORNERS image → proves mode takes effect
+        let drawCall = 0;
+        let cornerPx60;
+        const p5b = new P5b({
+            width: 100, height: 100, fps: 60,
+            setup: () => { createCanvas(100, 100); },
+            draw: () => {
+                drawCall++;
+                background(0);
+                const pg = createGraphics(20, 20);
+                pg.background(255, 0, 0);
+                if (drawCall === 1) {
+                    imageMode(CORNER);
+                    image(pg, 30, 30);
+                } else {
+                    imageMode(CORNERS);
+                    image(pg, 30, 30, 70, 70);
+                    noLoop();
+                }
+            }
+        });
+        p5b.on("error", (e) => { p5b.stop(); done(e.error); });
+        p5b.on("frame", (buffer) => {
+            const px = (x, y) => { const i = (y * 100 + x) * 4; return [buffer[i], buffer[i+1], buffer[i+2]]; };
+            if (drawCall === 1) {
+                cornerPx60 = px(60, 60);
+            } else {
+                const cornersPx60 = px(60, 60);
+                expect(cornerPx60).toEqual([0, 0, 0]);   // outside CORNER image
+                expect(cornersPx60).toEqual([255, 0, 0]); // inside CORNERS image
+                p5b.stop();
+                done();
+            }
+        });
+        p5b.run();
+    });
+});
+
 describe("P5b Integration - Mode/Style Functions", () => {
     // Helper: render one frame on a 100x100 canvas, return pixel reader
     function renderFrame(sketchConfig, cb) {

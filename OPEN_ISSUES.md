@@ -17,39 +17,12 @@ The following are implemented and have passing test coverage:
 - **Time Functions**: year(), month(), day(), hour(), minute(), second()
 - **Environment**: frameRate(), loop(), noLoop(), isLooping(), redraw()
 - **Loop lifecycle**: noLoop() in setup, noLoop() in draw, redraw() while stopped, loop()/noLoop() toggle, external control, frameCount preservation
-
----
-
-## Implemented — Needs Tests
-
-The following are bound and functional but lack explicit test coverage:
-
-| Function/Property | Category |
-|-------------------|----------|
-| `cursor()`, `noCursor()` | Environment (functions, not just constants) |
-| `imageMode()` | Mode/Style |
-| `rectMode()` | Mode/Style |
-| `ellipseMode()` | Mode/Style |
-| `strokeCap()` | Mode/Style |
-| `strokeJoin()` | Mode/Style |
-| `blendMode()` | Mode/Style |
-| `textAlign()` | Mode/Style + Typography |
-| `textLeading()` | Typography |
-| `textStyle()` | Typography |
-| `textWidth()` | Typography |
-| `textWrap()` | Typography |
-| `loadTable()` | Data/IO |
-| `loadStrings()` | Data/IO |
-| `saveTable()` | Data/IO |
-| `select()`, `selectAll()` | DOM |
-| `createDiv()` | DOM |
-| `createButton()` | DOM |
-| `createSlider()` | DOM |
-| `createSelect()` | DOM |
-| `createInput()` | DOM |
-| `createFileInput()` | DOM |
-| `pixelDensity()` | Environment |
-| `windowWidth`, `windowHeight` | Environment |
+- **Mode/Style**: rectMode(), ellipseMode(), strokeCap(), strokeJoin()
+- **Typography**: textLeading(), textStyle(), textWidth(), textAlign(), textWrap()
+- **Data/IO**: loadStrings(), loadTable()
+- **Environment (Extended)**: cursor(), noCursor(), pixelDensity(), windowWidth, windowHeight
+- **Accessibility**: describe(), describeElement(), textOutput(), gridOutput() (all noops in headless)
+- **imageMode()**: CORNER, CENTER, CORNERS
 
 ---
 
@@ -91,6 +64,14 @@ If a sketch creates graphics of many different sizes, the pool map grows indefin
 ## Known Unsupported (By Design)
 
 These require browser APIs unavailable in Node.js:
+
+### DOM Creation
+
+| Function | Notes |
+|----------|-------|
+| `createDiv()`, `createButton()`, `createSlider()` | No real DOM in headless |
+| `createSelect()`, `createInput()`, `createFileInput()` | No real DOM in headless |
+| `select()`, `selectAll()` | No real DOM in headless |
 
 ### Sound (p5.sound)
 
