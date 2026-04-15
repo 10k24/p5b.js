@@ -27,19 +27,9 @@ The following are implemented and have passing test coverage:
 
 ---
 
-## Missing Functionality
+## Next Up (v1.3.0)
 
-### Not Implemented
-
-| Feature | Notes |
-|---------|-------|
-| `global:` config option | Shared sketch-scope variables across preload/setup/draw |
-
-The `global:` config use case: sketches loaded via config (not `sketchPath`) cannot share variables across lifecycle functions without relying on `global.*` manually. A `global:` function in config would run before `preload` and inject variables into sketch scope.
-
----
-
-## Low Priority (Internal)
+These are the top priorities for the next release.
 
 ### 1. Graphics Pool State on Reuse
 
@@ -58,6 +48,27 @@ If a sketch creates graphics of many different sizes, the pool map grows indefin
 **Location:** `p5b.js` — pool management in `_initSketch` (~line 185)
 
 **Fix:** Cap bucket size per key, or add LRU eviction across the pool map.
+
+---
+
+### 3. `global:` Config Option
+
+Shared sketch-scope variables across `preload`/`setup`/`draw` when using inline config functions (no `sketchPath`).
+
+**Root cause:** When config supplies `{preload, setup, draw}` as functions, p5b assigns each to `global.*`. These functions are defined in the caller's closure — a `let x` inside `preload` is invisible to `setup`. Users must write `global.x = ...` explicitly to share state across lifecycle functions.
+
+By contrast, `sketchPath` sketches run via `vm.runInThisContext`, so top-level variables in the sketch file are shared naturally.
+
+**Fix:** Add a `global:` function to config that runs before `preload` and declares shared variables into global scope:
+
+```js
+new P5b({
+  global: () => { myImage = null; },
+  preload: () => { myImage = loadImage('img.png'); },
+  setup: () => { image(myImage, 0, 0); },
+  draw: () => {},
+});
+```
 
 ---
 
