@@ -49,12 +49,6 @@ If a sketch creates graphics of many different sizes, the pool map grows indefin
 
 **Fix:** Cap bucket size per key, or add LRU eviction across the pool map.
 
-### 3. `run()` → `stop()` → `run()` Lifecycle Test
-
-Calling `run()`, then `stop()`, then `run()` again on the same P5b instance should work without issues. The logic flow needs to be audited and a test written to cover this scenario.
-
----
-
 ### 3. `global:` Config Option
 
 Shared sketch-scope variables across `preload`/`setup`/`draw` when using inline config functions (no `sketchPath`).
@@ -76,17 +70,52 @@ new P5b({
 
 ---
 
+## Backlog
+
+Lower priority issues identified during code review. Not scoped to any specific release.
+
+### Code Quality
+
+#### Asset Path / URL Duplication
+`filePath.startsWith("http")` and `file://` URL construction duplicated across `loadImage`, `loadJSON`, `loadStrings`, `loadTable`. Extract to a shared helper.
+
+#### Preload Counter Duplication
+`p5._incrementPreload()` / `setImmediate(p5._decrementPreload())` pattern repeated across `loadImage`, `loadStrings`, `loadTable`. Extract to a helper.
+
+#### `fetch` Bound at Init Time
+`p5b-dom.js` sets `fetch: global.fetch` at construction time. If `fetch` isn't available yet (Node < 18 without polyfill), it's permanently `undefined`. Should be a getter: `get fetch() { return global.fetch; }`.
+
+#### `loadFont()` vs `loadJSON()` Inconsistency
+`loadFont()` is synchronous (blocking file I/O). `loadJSON()` is async. Surprising difference for users familiar with p5.js where both use the same callback/preload pattern.
+
+#### `async preload()` Silently Broken
+If a sketch uses `async function preload() { await loadJSON(...) }`, p5.js never awaits the returned promise. Assets will not be loaded before `setup()` runs. Should detect and warn.
+
+### API Gaps
+
+#### `loadJSON()` Callback Compatibility
+p5.js `loadJSON()` supports `loadJSON(path, successCallback, errorCallback)`. p5b's implementation is async-only. Sketches using the callback pattern will silently get no data.
+
+#### `loadStrings()` HTTP Support
+`loadStrings()` supports local files only. `loadImage()` and `loadJSON()` both support HTTP URLs. Inconsistent.
+
+#### `loadBytes()` Missing
+`loadBytes()` is not implemented. Calls will throw `"loadBytes is not defined"` with no helpful error.
+
+#### `loadXML()` Missing
+`loadXML()` is not implemented. Calls will throw `"loadXML is not defined"` with no helpful error.
+
+#### DOM Functions Behavior Unverified
+p5.js may auto-bind DOM functions (`createButton()`, `createCheckbox()`, `createRadio()`, `createSlider()`, `createColorPicker()`, `createInput()`, `createFileInput()`, `createSelect()`, `createDiv()`, `createP()`, `createSpan()`, `createImg()`, `createA()`, `createVideo()`, `createCapture()`, `createTextarea()`) via `_bindGlobals()`. Their actual behavior in headless has not been tested. Need to audit what p5.js exposes and whether calls succeed, silently fail, or crash.
+
+#### `select()`, `selectAll()`, `removeElements()` Not Implemented
+These query and manipulate p5-created DOM elements. In headless, all elements live in the DOM shim — these functions should query/manipulate the shim's tracked elements rather than a real browser DOM. Non-trivial to implement correctly.
+
+---
+
 ## Known Unsupported (By Design)
 
 These require browser APIs unavailable in Node.js:
-
-### DOM Creation
-
-| Function | Notes |
-|----------|-------|
-| `createDiv()`, `createButton()`, `createSlider()` | No real DOM in headless |
-| `createSelect()`, `createInput()`, `createFileInput()` | No real DOM in headless |
-| `select()`, `selectAll()` | No real DOM in headless |
 
 ### Sound (p5.sound)
 
