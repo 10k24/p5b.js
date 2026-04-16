@@ -31,4 +31,5 @@ function setup() {
 }
 
 function draw() {
+    noLoop();
 }

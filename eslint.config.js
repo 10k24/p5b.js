@@ -15,7 +15,14 @@ module.exports = [
                 clearImmediate: "readonly",
                 Buffer: "readonly",
                 setInterval: "readonly",
-                clearInterval: "readonly"
+                clearInterval: "readonly",
+                setTimeout: "readonly",
+                createCanvas: "readonly",
+                background: "readonly",
+                createGraphics: "readonly",
+                fill: "readonly",
+                noStroke: "readonly",
+                rect: "readonly"
             }
         },
         rules: {
@@ -50,9 +57,26 @@ module.exports = [
                 height: "readonly",
                 createGraphics: "readonly",
                 loadFont: "readonly",
+                loadJSON: "readonly",
                 noStroke: "readonly",
                 ellipse: "readonly",
-                image: "readonly"
+                image: "readonly",
+                saveCanvas: "readonly",
+                saveJSON: "readonly",
+                print: "readonly",
+                mouseX: "readonly",
+                mouseY: "readonly",
+                key: "readonly",
+                keyCode: "readonly",
+                mousePressed: "readonly",
+                keyPressed: "readonly",
+                touchStarted: "readonly",
+                accelerationX: "readonly",
+                accelerationY: "readonly",
+                accelerationZ: "readonly",
+                loadImage: "readonly",
+                noLoop: "readonly",
+                path: "readonly"
             }
         },
         rules: {
@@ -79,9 +103,24 @@ module.exports = [
                 height: "readonly",
                 createGraphics: "readonly",
                 loadFont: "readonly",
+                loadJSON: "readonly",
                 noStroke: "readonly",
                 ellipse: "readonly",
-                image: "readonly"
+                image: "readonly",
+                saveCanvas: "readonly",
+                saveJSON: "readonly",
+                print: "readonly",
+                mouseX: "readonly",
+                mouseY: "readonly",
+                key: "readonly",
+                keyCode: "readonly",
+                mousePressed: "readonly",
+                keyPressed: "readonly",
+                touchStarted: "readonly",
+                accelerationX: "readonly",
+                accelerationY: "readonly",
+                accelerationZ: "readonly",
+                loadImage: "readonly"
             }
         },
         rules: {

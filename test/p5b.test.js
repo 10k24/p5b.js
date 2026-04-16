@@ -1,6 +1,6 @@
 const { describe, it, expect } = require("bun:test");
+const path = require("path");
 const { P5b, P5B_DEFAULTS } = require("../p5b.js");
-const { P5bDOM } = require("../p5b-dom.js");
 
 describe("P5b Exports", () => {
     it("should export P5b class", () => {
@@ -86,7 +86,7 @@ describe("P5b Configuration Validation", () => {
 });
 
 describe("P5b Instance Management", () => {
-    it("should throw if run() is called twice without stop()", (done) => {
+    it("should throw if run() is called after remove()", (done) => {
         const p5b = new P5b({
             width: 32, height: 32,
             setup: () => { createCanvas(64, 64); },
@@ -94,16 +94,15 @@ describe("P5b Instance Management", () => {
         });
 
         p5b.on("frame", () => {
-            // Try to call run again while already running
-            expect(() => p5b.run()).toThrow("already running");
-            p5b.stop();
+            p5b.remove();
+            expect(() => p5b.run()).toThrow("removed");
             done();
         });
 
         p5b.run();
     });
 
-    it("should properly cleanup when stopped", (done) => {
+    it("should properly cleanup when removed", (done) => {
         const p5b = new P5b({
             width: 32, height: 32,
             setup: () => { createCanvas(64, 64); },
@@ -111,9 +110,9 @@ describe("P5b Instance Management", () => {
         });
 
         p5b.on("frame", () => {
-            p5b.stop();
-            
-            // After stop, internal state should be cleared
+            p5b.remove();
+
+            // After remove, internal state should be cleared
             expect(p5b._myP5).toBeNull();
             expect(p5b._destCanvas).toBeNull();
             expect(p5b._gfxActive.length).toBe(0);
@@ -238,6 +237,53 @@ describe("P5b Global Bindings", () => {
             setup: () => {
                 createCanvas(64, 64);
                 expect(() => loadFont("/nonexistent/path/to/font.ttf")).toThrow();
+            },
+            draw: () => { background(100); }
+        });
+
+        p5b.on("frame", () => {
+            p5b.stop();
+            done();
+        });
+
+        p5b.run();
+    });
+
+    it("should load a valid font file successfully", (done) => {
+        const fontPath = path.join(process.cwd(), "test/fixtures/font/SourceCodePro-Regular.ttf");
+        let loadedFont = null;
+
+        const p5b = new P5b({
+            width: 32, height: 32,
+            setup: () => {
+                createCanvas(64, 64);
+                loadedFont = loadFont(fontPath);
+            },
+            draw: () => { background(100); }
+        });
+
+        p5b.on("frame", () => {
+            expect(loadedFont).toBeDefined();
+            expect(loadedFont.font).toBeDefined();
+            expect(loadedFont.font.names).toBeDefined();
+            p5b.stop();
+            done();
+        });
+
+        p5b.run();
+    });
+
+    it("should throw with friendly message when font file not found", (done) => {
+        const p5b = new P5b({
+            width: 32, height: 32,
+            setup: () => {
+                createCanvas(64, 64);
+                try {
+                    loadFont("/nonexistent/path/to/font.ttf");
+                } catch (error) {
+                    expect(error.message).toContain("Failed to load font");
+                    expect(error.message).toContain("file not found");
+                }
             },
             draw: () => { background(100); }
         });

@@ -1,4 +1,5 @@
 const canvas = require("canvas");
+const { version } = require("./package.json");
 
 const noop = () => {};
 const spliceFrom = (arr, item) => {
@@ -29,9 +30,21 @@ class P5bDOM {
         this._canvases.length = 0;
     }
 
+    resize(newWidth, newHeight) {
+        this.width = newWidth;
+        this.height = newHeight;
+        this._bodyChildren.length = 0;
+        this._canvases.length = 0;
+        this._init();
+    }
+
     _init() {
         const bodyChildren = this._bodyChildren;
         const allCanvases = this._canvases;
+
+        // Absorbs unguarded el.parentNode.removeChild(el) calls from p5.js internals
+        // when an element has no real parent (matches silent browser behavior).
+        const detachedParent = { removeChild: noop, appendChild: noop };
 
         const makeStubElement = (tag) => {
             const el = {
@@ -51,7 +64,7 @@ class P5bDOM {
                 setAttribute: noop,
                 getAttribute: () => null,
                 getBoundingClientRect: () => ({ left: 0, top: 0, width: 0, height: 0, right: 0, bottom: 0 }),
-                parentNode: null,
+                parentNode: detachedParent,
                 childNodes: [],
                 children: [],
                 innerHTML: "",
@@ -70,7 +83,7 @@ class P5bDOM {
             c.removeEventListener = noop;
             c.dispatchEvent = () => true;
             c.getBoundingClientRect = () => ({ left: 0, top: 0, width: c.width, height: c.height, right: c.width, bottom: c.height });
-            c.parentNode = null;
+            c.parentNode = detachedParent;
             c.style = {};
             allCanvases.push(c);
             return c;
@@ -86,7 +99,7 @@ class P5bDOM {
                 appendChild: (el) => { bodyChildren.push(el); if (el && typeof el === "object") el.parentNode = document.body; return el; },
                 removeChild: (el) => {
                     spliceFrom(bodyChildren, el);
-                    if (el && typeof el === "object") el.parentNode = null;
+                    if (el && typeof el === "object") el.parentNode = detachedParent;
                     spliceFrom(allCanvases, el);
                     return el;
                 },
@@ -129,7 +142,7 @@ class P5bDOM {
         const win = {
             document,
             screen: { width: this.width, height: this.height },
-            navigator: { userAgent: "Node.js", languages: ["en"], language: "en", userLanguage: "en", mediaDevices: null },
+            navigator: { userAgent: `p5b-dom/${version}`, languages: ["en"], language: "en", userLanguage: "en", mediaDevices: { getUserMedia: () => Promise.reject(new Error("getUserMedia not supported in headless")) } },
             addEventListener: noop,
             removeEventListener: noop,
             dispatchEvent: () => true,
@@ -146,15 +159,19 @@ class P5bDOM {
             HTMLCanvasElement: canvas.Canvas,
             ImageData: canvas.ImageData,
             performance: { now: () => Date.now() },
+            fetch: global.fetch,
         };
 
         global.window = win;
         global.document = document;
         global.screen = win.screen;
-        if (!Object.getOwnPropertyDescriptor(global, "navigator")) {
+
+        const navDesc = Object.getOwnPropertyDescriptor(global, "navigator");
+        if (!navDesc || navDesc.configurable) {
             Object.defineProperty(global, "navigator", {
                 get: () => global.window.navigator,
-                configurable: true
+                configurable: true,
+                enumerable: true,
             });
         }
         global.HTMLCanvasElement = canvas.Canvas;

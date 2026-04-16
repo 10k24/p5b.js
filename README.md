@@ -6,7 +6,6 @@ NOTE: several features are untested or unsupported, including the following:
 - p5.js v2.x
 - webgl
 - shaders
-- images
 - video
 - sound
 - third party plugins or extensions
@@ -65,21 +64,29 @@ Creates a new P5b instance with the given options.
 
 #### `run()`
 
-Start sketch execution and begin rendering frames.
+Start or resume sketch execution. On first call, initializes the p5 instance. After `stop()`, resumes the draw loop. Throws if called after `remove()`.
 
 ```javascript
 p5b.run();
 ```
 
-Throws if already running.
-
 #### `stop()`
 
-Stop sketch execution and clean up resources.
+Pause sketch execution. The p5 instance and canvas are kept alive. Call `run()` to resume.
 
 ```javascript
 p5b.stop();
 ```
+
+#### `remove()`
+
+Fully tear down the p5 instance and free all resources. Calling `run()` after `remove()` throws.
+
+```javascript
+p5b.remove(); // or p5b.clear()
+```
+
+`clear()` is an alias for `remove()`.
 
 #### `toFrame()`
 
@@ -162,6 +169,38 @@ const [r, g, b, a] = buffer.slice(idx, idx + 4);
   - Reducing `fps`
   - Reducing `width` / `height`
   - Optimizing `draw()` logic
+
+### Happy Path Optimization
+
+When your sketch calls `createCanvas(w, h)` with dimensions that exactly match the p5b `width` and `height` config, p5b reads pixels directly from the canvas without any resizing step. This is ~2× faster per frame.
+
+```javascript
+// Fast: canvas matches p5b output dimensions — no resize
+const p5b = new P5b({ width: 512, height: 512, ... });
+// In sketch: createCanvas(512, 512)
+
+// Slower: canvas is larger than p5b output — resized every frame
+const p5b = new P5b({ width: 256, height: 256, ... });
+// In sketch: createCanvas(512, 512)
+```
+
+### Browser Preview (p5.js Web Editor)
+
+p5b sets `navigator.userAgent` to `"p5b-dom/<version>"` so sketches can detect the headless environment. Use this to scale up the canvas for a readable preview when running in the browser, while keeping the output dimensions small for p5b:
+
+```javascript
+function setup() {
+  createCanvas(64, 64);
+  if (!navigator.userAgent.includes('p5b')) {
+    resizeCanvas(
+      floor(min(windowWidth, windowHeight) / width) * width,
+      floor(min(windowWidth, windowHeight) / height) * height
+    );
+  }
+}
+```
+
+This scales the canvas to the largest integer multiple that fits the window — no CSS, no interpolation artifacts.
 
 ## Transport Layer
 
