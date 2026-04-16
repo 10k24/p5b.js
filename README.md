@@ -64,21 +64,29 @@ Creates a new P5b instance with the given options.
 
 #### `run()`
 
-Start sketch execution and begin rendering frames.
+Start or resume sketch execution. On first call, initializes the p5 instance. After `stop()`, resumes the draw loop. Throws if called after `remove()`.
 
 ```javascript
 p5b.run();
 ```
 
-Throws if already running.
-
 #### `stop()`
 
-Stop sketch execution and clean up resources.
+Pause sketch execution. The p5 instance and canvas are kept alive. Call `run()` to resume.
 
 ```javascript
 p5b.stop();
 ```
+
+#### `remove()`
+
+Fully tear down the p5 instance and free all resources. Calling `run()` after `remove()` throws.
+
+```javascript
+p5b.remove(); // or p5b.clear()
+```
+
+`clear()` is an alias for `remove()`.
 
 #### `toFrame()`
 
