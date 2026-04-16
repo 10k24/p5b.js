@@ -27,19 +27,6 @@ The following are implemented and have passing test coverage:
 
 ---
 
-## Blockers (v1.2.0)
-
-### `_cleanupGlobals()` — Broken, Not Called
-
-`_cleanupGlobals()` exists in `p5b.js` but is never called. It cannot safely be called in `stop()` as-is because:
-
-1. It deletes DOM globals (`window`, `document`, etc.) owned by `_dom`, breaking any subsequent `run()` call on any P5b instance
-2. It does NOT clean the p5 function globals (`background`, `fill`, `stroke`, ...) set by `_bindGlobals()` — the actual leak
-
-**Fix:** Either rewrite to only delete p5 function globals (by tracking what `_bindGlobals()` set), or confirm `_myP5.remove()` handles p5's own teardown and delete `_cleanupGlobals()` entirely.
-
----
-
 ## Next Up (v1.3.0)
 
 These are the top priorities for the next release.

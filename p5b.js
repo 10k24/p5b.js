@@ -94,22 +94,6 @@ class P5b extends EventEmitter {
         this.remove();
     }
 
-    _cleanupGlobals() {
-        // TODO: audit these, may need more/less removals
-        delete global.window;
-        delete global.document;
-        delete global.screen;
-        if (Object.getOwnPropertyDescriptor(global, "navigator")) {
-            delete global.navigator;
-        }
-        delete global.HTMLCanvasElement;
-        delete global.ImageData;
-        delete global.requestAnimationFrame;
-        delete global.cancelAnimationFrame;
-        delete global.Event;
-        delete global.MouseEvent;
-    }
-
     toFrame() {
         const srcCanvas = this._myP5?.canvas;
         if (!srcCanvas) {
