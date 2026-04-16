@@ -39,6 +39,7 @@ class P5b extends EventEmitter {
         this._gfxPool = new Map();
         this._gfxActive = [];
         this._redrawing = false;
+        this._removed = false;
         this._metrics = {
             framesDrawn: 0,
             errors: 0
@@ -48,10 +49,18 @@ class P5b extends EventEmitter {
     }
 
     run() {
-        if (this._myP5) {
-            throw new Error("P5b is already running. Call stop() before run().");
+        if (this._removed) {
+            throw new Error("P5b instance has been removed. Create a new instance to run again.");
         }
 
+        // Resume after stop()
+        if (this._myP5) {
+            this._myP5.loop();
+            this._myP5.redraw();
+            return;
+        }
+
+        // First run
         const sketch = (pInstance) => {
             this._myP5 = pInstance;
             this._bindGlobals();
@@ -68,12 +77,21 @@ class P5b extends EventEmitter {
     }
 
     stop() {
+        this._myP5?.noLoop();
+    }
+
+    remove() {
         this._myP5?.remove();
         this._myP5 = null;
         this._destCanvas = null;
         this._dom.clear();
         this._gfxPool.clear();
         this._gfxActive = [];
+        this._removed = true;
+    }
+
+    clear() {
+        this.remove();
     }
 
     _cleanupGlobals() {

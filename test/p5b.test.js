@@ -86,7 +86,7 @@ describe("P5b Configuration Validation", () => {
 });
 
 describe("P5b Instance Management", () => {
-    it("should throw if run() is called twice without stop()", (done) => {
+    it("should throw if run() is called after remove()", (done) => {
         const p5b = new P5b({
             width: 32, height: 32,
             setup: () => { createCanvas(64, 64); },
@@ -94,16 +94,15 @@ describe("P5b Instance Management", () => {
         });
 
         p5b.on("frame", () => {
-            // Try to call run again while already running
-            expect(() => p5b.run()).toThrow("already running");
-            p5b.stop();
+            p5b.remove();
+            expect(() => p5b.run()).toThrow("removed");
             done();
         });
 
         p5b.run();
     });
 
-    it("should properly cleanup when stopped", (done) => {
+    it("should properly cleanup when removed", (done) => {
         const p5b = new P5b({
             width: 32, height: 32,
             setup: () => { createCanvas(64, 64); },
@@ -111,9 +110,9 @@ describe("P5b Instance Management", () => {
         });
 
         p5b.on("frame", () => {
-            p5b.stop();
-            
-            // After stop, internal state should be cleared
+            p5b.remove();
+
+            // After remove, internal state should be cleared
             expect(p5b._myP5).toBeNull();
             expect(p5b._destCanvas).toBeNull();
             expect(p5b._gfxActive.length).toBe(0);

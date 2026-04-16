@@ -2678,6 +2678,41 @@ describe("P5b Integration - navigator.userAgent", () => {
     });
 });
 
+describe("P5b Integration - run/stop/run lifecycle", () => {
+    it("emits frames correctly after stop() and run() again", (done) => {
+        let frameCount = 0;
+        let timeoutRan = false;
+
+        const p5b = new P5b({
+            width: 16, height: 16, fps: 30,
+            setup: () => { createCanvas(16, 16); },
+            draw: () => { background(0, 255, 0); },
+        });
+
+        p5b.on("error", (e) => { p5b.stop(); done(e.error); });
+        p5b.on("frame", (pixels) => {
+            frameCount++;
+            expect(pixels[0]).toBe(0);
+            expect(pixels[1]).toBe(255);
+            expect(pixels[2]).toBe(0);
+            p5b.stop();
+        });
+
+        p5b.run();
+
+        setTimeout(() => {
+            p5b.run();
+            timeoutRan = true;
+        }, 2000);
+
+        setTimeout(() => {
+            expect(frameCount).toBe(2);
+            expect(timeoutRan).toBe(true);
+            done();
+        }, 4000);
+    }, 10000);
+});
+
 describe("P5b Integration - toFrame loadPixels happy path", () => {
     it("emits correct RGBA pixels when canvas matches p5b dimensions", (done) => {
         const WIDTH = 16;
