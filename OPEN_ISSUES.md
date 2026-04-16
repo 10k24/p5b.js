@@ -93,6 +93,7 @@ document.fonts.add(font);
 
 #### Asset Path / URL Duplication
 `filePath.startsWith("http")` and `file://` URL construction duplicated across `loadImage`, `loadJSON`, `loadStrings`, `loadTable`. Extract to a shared helper.
+`filePath.startsWith("http")` check catches valid filenames like "http-image.jpg". Use `/^https?:\/\//` regex instead.
 
 #### Preload Counter Duplication
 `p5._incrementPreload()` / `setImmediate(p5._decrementPreload())` pattern repeated across `loadImage`, `loadStrings`, `loadTable`. Extract to a helper.
