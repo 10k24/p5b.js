@@ -74,6 +74,21 @@ new P5b({
 
 Lower priority issues identified during code review. Not scoped to any specific release.
 
+#### Remote font loading
+
+Add an example to test importing fonts via pure JS solution from Adobe & Google fonts. Something like...
+
+```js
+const link = document.createElement('link');
+link.href = 'https://fonts.googleapis.com/css2?family=Roboto';
+link.rel = 'stylesheet';
+document.head.appendChild(link);
+
+const font = new FontFace('Roboto', 'url(https://fonts.googleapis.com/...)');
+await font.load();
+document.fonts.add(font);
+```
+
 ### Code Quality
 
 #### Asset Path / URL Duplication
