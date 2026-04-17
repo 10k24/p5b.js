@@ -139,6 +139,7 @@ See [examples/](examples/) for runnable examples:
 - [examples/ex-file-based.js](examples/ex-file-based.js) — Loading sketch from file
 - [examples/ex-inline.js](examples/ex-inline.js) — Using setup/draw callbacks
 - [examples/ex-p5b-zmq.js](examples/ex-p5b-zmq.js) — ZeroMQ frame transport
+- [examples/ex-terminal-cli.js](examples/ex-terminal-cli.js) — Render a p5.js sketch in the terminal using truecolor ANSI half-block characters.
 
 
 ## Buffer Format
