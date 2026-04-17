@@ -1,4 +1,4 @@
-// Render a p5b sketch in the terminal using truecolor ANSI half-block characters.
+// Render a p5.js sketch in the terminal using truecolor ANSI half-block characters.
 // Works in any truecolor terminal (Ghostty, Kitty, iTerm2, WezTerm, etc.)
 const { P5b } = require("../p5b.js");
 
@@ -10,10 +10,13 @@ if (!sketchPath) {
 }
 
 // Set sketch size based on terminal dimensions
-// Each character cell = 1 col × 2 rows of pixels, so HEIGHT must be even.
+// Each character cell = 1 col × 2 rows of pixels, so windowHeight must be even.
 // Reserve 1 row to prevent scroll (which breaks cursor-home positioning).
-global.WIDTH = process.stdout.columns || 80;
-global.HEIGHT = ((process.stdout.rows || 30) - 1) * 2;
+// 
+// Note: we must bootstrap these values here, which typically
+// are defined in the p5b wrapped version of createCanvas(w, h)
+global.windowWidth = process.stdout.columns || 80;
+global.windowHeight = ((process.stdout.rows || 30) - 1) * 2;
 
 process.stdout.write("\x1b[?25l");
 process.on("exit", () => process.stdout.write("\x1b[?25h"));
@@ -23,8 +26,9 @@ process.on("SIGINT", () => {
 });
 
 const p5b = new P5b({
-    width: WIDTH,
-    height: HEIGHT,
+    width: windowWidth,
+    height: windowHeight,
+    framerate: 60,
     sketchPath: sketchPath
 });
 
@@ -44,7 +48,7 @@ function frameToAnsi(buf, w, h) {
 }
 
 p5b.on("frame", (buffer) => {
-    process.stdout.write(frameToAnsi(buffer, WIDTH, HEIGHT));
+    process.stdout.write(frameToAnsi(buffer, windowWidth, windowHeight));
 });
 
 p5b.run();
