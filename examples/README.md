@@ -40,6 +40,21 @@ The sketch draws an animated checkerboard pattern that scales from 400x400 (draw
 
 Press `Ctrl+C` to close the connection and exit.
 
+## Terminal Renderer Example
+
+Renders a p5.js sketch live in the terminal using truecolor ANSI half-block characters.
+
+**Usage:**
+
+```bash
+node ex-terminal.js
+```
+
+**Requirements:**
+- Truecolor terminal (Ghostty, Kitty, iTerm2, WezTerm, etc.)
+
+Press `Ctrl+C` to exit.
+
 ## Notes
 
 - Examples require dependencies installed separately and do NOT affect the core p5b library installation
