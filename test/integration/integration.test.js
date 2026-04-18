@@ -574,15 +574,19 @@ describe("P5b Integration - Buffer Analysis", () => {
         });
     });
 
-    it("should throw when sketchPath file does not exist", () => {
-        expect(() => {
-            new P5b({
-                width: 32,
-                height: 32,
-                fps: 30,
-                sketchPath: "/nonexistent/path/sketch.js"
-            });
-        }).toThrow();
+    it("should throw when sketchPath file does not exist", (done) => {
+        const p5b = new P5b({
+            width: 32,
+            height: 32,
+            fps: 30,
+            sketchPath: "/nonexistent/path/sketch.js"
+        });
+        p5b.on("error", (err) => {
+            expect(err.error.message).toContain("ENOENT");
+            p5b.stop();
+            done();
+        });
+        p5b.run();
     });
 
     it("should emit error event when setup throws", (done) => {

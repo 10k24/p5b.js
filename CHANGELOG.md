@@ -1,5 +1,15 @@
 # Changelog
 
+## [1.2.1]
+
+### Bug Fixes
+
+- Fixed `windowWidth`/`windowHeight` being undefined when accessed at top-level in `sketchPath` mode
+
+### Examples
+
+- Added terminal renderer CLI example (`ex-terminal-cli.js`)
+
 ## [1.2.0]
 
 ### Breaking Changes

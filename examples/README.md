@@ -40,7 +40,26 @@ The sketch draws an animated checkerboard pattern that scales from 400x400 (draw
 
 Press `Ctrl+C` to close the connection and exit.
 
-## Notes
+## Terminal Renderer (CLI) Examples
 
-- Examples require dependencies installed separately and do NOT affect the core p5b library installation
-- Each example is self-contained and can be run independently
+Renders a p5.js sketch from a file in the terminal using truecolor ANSI half-block characters.
+
+**Usage:**
+
+```bash
+node ex-terminal-cli.js <sketch-path>
+```
+
+**Example:**
+
+```bash
+node ex-terminal-cli.js sketch-rings.js
+```
+
+**Requirements:**
+- Truecolor terminal (Ghostty, Kitty, iTerm2, WezTerm, etc.)
+- A sketch file that defines `setup()` and `draw()` functions
+
+**Included Sketch:** `sketch-rings.js` - Animated concentric rings pattern
+
+Press `Ctrl+C` to exit.

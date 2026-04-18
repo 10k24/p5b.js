@@ -226,6 +226,25 @@ class P5b extends EventEmitter {
             }
         }
 
+        // Bind windowWidth/windowHeight explicitly - they may not exist on p5 instance
+        // until createCanvas() is called, but should still be accessible
+        // Use ?? 0 fallback to match p5.js behavior before createCanvas()
+        Object.defineProperty(global, "windowWidth", {
+            get: () => this._myP5?.windowWidth ?? 0,
+            configurable: true
+        });
+        Object.defineProperty(global, "windowHeight", {
+            get: () => this._myP5?.windowHeight ?? 0,
+            configurable: true
+        });
+
+        // Execute sketch if provided (overwrites globals)
+        if (this.sketchPath) {
+            const absoluteSketchPath = path.resolve(this.sketchPath);
+            const code = fs.readFileSync(absoluteSketchPath, "utf8");
+            vm.runInThisContext(code, { filename: absoluteSketchPath });
+        }
+
         global._resolveAssetPath = function(sketchPath, filePath) {
             const assetDir = sketchPath
                 ? path.dirname(path.resolve(sketchPath))
@@ -665,13 +684,6 @@ class P5b extends EventEmitter {
         global.preload = this.preload;
         global.setup = this.setup;
         global.draw = this.draw;
-
-        // Execute sketch if provided (overwrites globals)
-        if (this.sketchPath) {
-            const absoluteSketchPath = path.resolve(this.sketchPath);
-            const code = fs.readFileSync(absoluteSketchPath, "utf8");
-            vm.runInThisContext(code, { filename: absoluteSketchPath });
-        }
     }
 }
 

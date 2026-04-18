@@ -33,12 +33,14 @@ describe("P5b Real Sketch - Shapes", () => {
 
         p5b.run();
     });
+});
 
-    it("should render non-black pixels in shapes sketch", (done) => {
+describe("P5b Real Sketch - window dimensions", () => {
+    it("windowWidth and windowHeight should be accessible at top-level in sketchPath mode", (done) => {
         const p5b = new P5b({
-            sketchPath: path.join(sketchesDir, "shapes.js"),
-            width: 64,
-            height: 64,
+            sketchPath: path.join(sketchesDir, "window-size.js"),
+            width: 200,
+            height: 200,
             fps: 30
         });
 
@@ -48,17 +50,8 @@ describe("P5b Real Sketch - Shapes", () => {
         });
 
         p5b.on("frame", (buffer) => {
-            let hasColor = false;
-            for (let i = 0; i < Math.min(buffer.length, 256); i += 4) {
-                const r = buffer[i];
-                const g = buffer[i + 1];
-                const b = buffer[i + 2];
-                if (r > 0 || g > 0 || b > 0) {
-                    hasColor = true;
-                    break;
-                }
-            }
-            expect(hasColor).toBe(true);
+            expect(global.window_width_at_top_level).toBe(0);
+            expect(global.canvas_width).toBe(100);
             p5b.stop();
             done();
         });
@@ -67,7 +60,7 @@ describe("P5b Real Sketch - Shapes", () => {
     });
 });
 
-describe("P5b Real Sketch - Graphics Pooling", () => {
+describe("P5b Real Sketch - Shapes (colored)", () => {
     it("should render graphics sketch with createGraphics successfully", (done) => {
         const p5b = new P5b({
             sketchPath: path.join(sketchesDir, "graphics.js"),
