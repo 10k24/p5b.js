@@ -25,32 +25,35 @@ function draw() {
 
     const radius = (2 * frameCount) % maxRadius;
 
+    const cX = windowWidth / 2;
+    const cY = windowHeight / 2;
+
     fill(hexColors[fgIdx]);
-    ellipse(windowWidth / 2, windowHeight / 2, radius * 1.5);
+    ellipse(cX, cY, radius * 1.5);
 
     fill(hexColors[bgIdx]);
-    ellipse(windowWidth / 2, windowHeight / 2, radius * 1.2);
+    ellipse(cX, cY, radius * 1.2);
 
     fill(hexColors[fgIdx]);
-    ellipse(windowWidth / 2, windowHeight / 2, radius);
+    ellipse(cX, cY, radius);
 
     fill(hexColors[bgIdx]);
-    ellipse(windowWidth / 2, windowHeight / 2, radius * 0.8);
+    ellipse(cX, cY, radius * 0.8);
 
     fill(hexColors[fgIdx]);
-    ellipse(windowWidth / 2, windowHeight / 2, radius * 0.6);
+    ellipse(cX, cY, radius * 0.6);
 
     fill(hexColors[bgIdx]);
-    ellipse(windowWidth / 2, windowHeight / 2, radius / 2);
+    ellipse(cX, cY, radius / 2);
 
     fill(hexColors[fgIdx]);
-    ellipse(windowWidth / 2, windowHeight / 2, radius / 4);
+    ellipse(cX, cY, radius / 4);
 
     fill(hexColors[bgIdx]);
-    ellipse(windowWidth / 2, windowHeight / 2, radius / 8);
+    ellipse(cX, cY, radius / 8);
 
     fill(hexColors[fgIdx]);
-    ellipse(windowWidth / 2, windowHeight / 2, radius / 16);
+    ellipse(cX, cY, radius / 16);
 
     if (radius <= 1) {
         bgIdx = fgIdx;
