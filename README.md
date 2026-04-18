@@ -18,6 +18,8 @@ npm install @10k24/p5b
 
 ## Quick Start
 
+**Inline mode** — define setup/draw callbacks directly:
+
 ```javascript
 const { P5b } = require("@10k24/p5b");
 
@@ -31,6 +33,25 @@ const p5b = new P5b({
     draw() {
     // p5 draw code
     }
+});
+
+p5b.on("frame", (buffer) => {
+    // Process frame buffer
+});
+
+p5b.run();
+```
+
+**Sketch file mode** — load a `.js` sketch file (defines `setup`/`draw` as globals):
+
+```javascript
+const { P5b } = require("@10k24/p5b");
+
+const p5b = new P5b({
+    width: 400,
+    height: 400,
+    fps: 60,
+    sketchPath: "./my-sketch.js"
 });
 
 p5b.on("frame", (buffer) => {
