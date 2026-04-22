@@ -1,5 +1,16 @@
 # Changelog
 
+## [1.2.2]
+
+### Bug Fixes
+
+- Fixed `loadImage()` failing due to canvas v3 async image decoding (`rawImg.onload` not awaited before `drawImage`)
+- Fixed `loadImage()` passing entire Node.js memory pool buffer to canvas instead of exact file size
+
+### Minor Changes
+
+- Relax runtime requirement from Node.js v22 to v20
+
 ## [1.2.1]
 
 ### Bug Fixes
