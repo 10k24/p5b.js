@@ -48,8 +48,8 @@ describe("Performance - toFrame() happy path vs scale path", () => {
             draw: () => { background(100, 150, 200); },
         });
 
-        const happyMs = await runBench(happyP5b);
         const scaleMs = await runBench(scaleP5b);
+        const happyMs = await runBench(happyP5b);
 
         console.log(`  happy path: ${happyMs.toFixed(3)}ms/frame`);
         console.log(`  scale path: ${scaleMs.toFixed(3)}ms/frame`);
