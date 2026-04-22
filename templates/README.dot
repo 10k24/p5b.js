@@ -1,5 +1,7 @@
 # @10k24/p5b
 
+[![npm](https://img.shields.io/npm/v/@10k24/p5b)](https://www.npmjs.com/package/@10k24/p5b)
+
 Render p5.js sketches to RGBA pixel buffers in Node.js.
 
 NOTE: several features are untested or unsupported, including the following:
