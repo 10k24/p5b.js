@@ -295,13 +295,16 @@ class P5b extends EventEmitter {
 
                 const loadImageData = (imageData) => {
                     const rawImg = new canvas.Image();
+                    rawImg.onload = () => {
+                        pImg = new (that._loadP5()).Image(rawImg.width, rawImg.height);
+                        pImg.drawingContext.drawImage(rawImg, 0, 0);
+                        // Ignoring for now, only needed for webGL to refresh textures
+                        // pImg.modified = true;
+                        if (onSuccess) onSuccess(pImg);
+                        setImmediate(() => p5._decrementPreload());
+                    };
+                    rawImg.onerror = (err) => handleError(err instanceof Error ? err : new Error(String(err)));
                     rawImg.src = Buffer.from(imageData);
-                    pImg = new (that._loadP5()).Image(rawImg.width, rawImg.height);
-                    pImg.drawingContext.drawImage(rawImg, 0, 0);
-                    // Ignoring for now, only needed for webGL to refresh textures
-                    // pImg.modified = true;
-                    if (onSuccess) onSuccess(pImg);
-                    setImmediate(() => p5._decrementPreload());
                 };
 
                 const handleError = (error) => {
@@ -313,7 +316,7 @@ class P5b extends EventEmitter {
                 if (url.startsWith("file://")) {
                     try {
                         const buf = fs.readFileSync(resolvedPath);
-                        loadImageData(buf.buffer);
+                        loadImageData(buf.buffer.slice(buf.byteOffset, buf.byteOffset + buf.byteLength));
                     } catch (error) {
                         handleError(error);
                     }

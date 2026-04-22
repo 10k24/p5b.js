@@ -120,6 +120,32 @@ describe("API Compatibility: loadImage", () => {
         p5b.run();
     });
 
+    it("should load a local PNG file with correct pixel data", (done) => {
+        const testImagePath = path.join("test/fixtures/img", "test-red-pixel.png");
+        let loadedImg = null;
+        const p5b = new P5b({
+            preload: function() {
+                loadedImg = loadImage(testImagePath);
+            },
+            setup: function() {},
+            draw: function() {}
+        });
+        p5b.on("frame", () => {
+            expect(loadedImg).toBeDefined();
+            expect(loadedImg.width).toBe(4);
+            expect(loadedImg.height).toBe(4);
+            // Verify top-left pixel is red — catches buffer corruption and async load bugs
+            loadedImg.loadPixels();
+            expect(loadedImg.pixels[0]).toBe(255); // R
+            expect(loadedImg.pixels[1]).toBe(0);   // G
+            expect(loadedImg.pixels[2]).toBe(0);   // B
+            expect(loadedImg.pixels[3]).toBe(255); // A
+            p5b.stop();
+            done();
+        });
+        p5b.run();
+    });
+
     it("should call failureCallback on missing image file", (done) => {
         let error = null;
         const p5b = new P5b({
