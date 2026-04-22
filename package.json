@@ -1,6 +1,6 @@
 {
     "name": "@10k24/p5b",
-    "version": "1.2.1",
+    "version": "1.2.2",
     "description": "Run p5.js sketches in Node.js and stream RGBA pixel buffers",
     "author": "10k24",
     "main": "p5b.js",
@@ -37,7 +37,7 @@
     },
     "license": "LGPL-2.1-only",
     "engines": {
-        "node": ">=22.0.0"
+        "node": ">=20.0.0"
     },
     "type": "commonjs",
     "files": [
