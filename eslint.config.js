@@ -1,4 +1,39 @@
 const js = require("@eslint/js");
+const globals = require("globals");
+
+// p5.js sketch globals used in tests and fixtures
+const p5Globals = {
+    createCanvas: "readonly",
+    background: "readonly",
+    createGraphics: "readonly",
+    fill: "readonly",
+    noStroke: "readonly",
+    stroke: "readonly",
+    rect: "readonly",
+    circle: "readonly",
+    ellipse: "readonly",
+    image: "readonly",
+    frameCount: "readonly",
+    width: "readonly",
+    height: "readonly",
+    loadFont: "readonly",
+    loadJSON: "readonly",
+    loadImage: "readonly",
+    noLoop: "readonly",
+    saveCanvas: "readonly",
+    saveJSON: "readonly",
+    print: "readonly",
+    mouseX: "readonly",
+    mouseY: "readonly",
+    key: "readonly",
+    keyCode: "readonly",
+    mousePressed: "readonly",
+    keyPressed: "readonly",
+    touchStarted: "readonly",
+    accelerationX: "readonly",
+    accelerationY: "readonly",
+    accelerationZ: "readonly",
+};
 
 module.exports = [
     {
@@ -7,22 +42,14 @@ module.exports = [
             ecmaVersion: "latest",
             sourceType: "commonjs",
             globals: {
-                global: "readonly",
-                console: "readonly",
-                process: "readonly",
+                ...globals.node,
                 document: "readonly",
-                setImmediate: "readonly",
-                clearImmediate: "readonly",
-                Buffer: "readonly",
-                setInterval: "readonly",
-                clearInterval: "readonly",
-                setTimeout: "readonly",
                 createCanvas: "readonly",
                 background: "readonly",
                 createGraphics: "readonly",
                 fill: "readonly",
                 noStroke: "readonly",
-                rect: "readonly"
+                rect: "readonly",
             }
         },
         rules: {
@@ -43,43 +70,17 @@ module.exports = [
             ecmaVersion: "latest",
             sourceType: "commonjs",
             globals: {
+                ...globals.node,
+                ...globals.browser,
                 describe: "readonly",
                 it: "readonly",
                 expect: "readonly",
-                createCanvas: "readonly",
-                background: "readonly",
-                fill: "readonly",
-                stroke: "readonly",
-                rect: "readonly",
-                circle: "readonly",
-                frameCount: "readonly",
-                width: "readonly",
-                height: "readonly",
-                createGraphics: "readonly",
-                loadFont: "readonly",
-                loadJSON: "readonly",
-                noStroke: "readonly",
-                ellipse: "readonly",
-                image: "readonly",
-                saveCanvas: "readonly",
-                saveJSON: "readonly",
-                print: "readonly",
-                mouseX: "readonly",
-                mouseY: "readonly",
-                key: "readonly",
-                keyCode: "readonly",
-                mousePressed: "readonly",
-                keyPressed: "readonly",
-                touchStarted: "readonly",
-                accelerationX: "readonly",
-                accelerationY: "readonly",
-                accelerationZ: "readonly",
-                loadImage: "readonly",
-                noLoop: "readonly",
-                path: "readonly"
+                path: "readonly",
+                ...p5Globals,
             }
         },
         rules: {
+            "no-console": "off",
             "no-unused-vars": "off"
         }
     },
@@ -89,41 +90,22 @@ module.exports = [
             ecmaVersion: "latest",
             sourceType: "module",
             globals: {
+                ...globals.node,
                 describe: "readonly",
                 it: "readonly",
                 expect: "readonly",
-                createCanvas: "readonly",
-                background: "readonly",
-                fill: "readonly",
-                stroke: "readonly",
-                rect: "readonly",
-                circle: "readonly",
-                frameCount: "readonly",
-                width: "readonly",
-                height: "readonly",
-                createGraphics: "readonly",
-                loadFont: "readonly",
-                loadJSON: "readonly",
-                noStroke: "readonly",
-                ellipse: "readonly",
-                image: "readonly",
-                saveCanvas: "readonly",
-                saveJSON: "readonly",
-                print: "readonly",
-                mouseX: "readonly",
-                mouseY: "readonly",
-                key: "readonly",
-                keyCode: "readonly",
-                mousePressed: "readonly",
-                keyPressed: "readonly",
-                touchStarted: "readonly",
-                accelerationX: "readonly",
-                accelerationY: "readonly",
-                accelerationZ: "readonly",
-                loadImage: "readonly"
+                ...p5Globals,
             }
         },
         rules: {
+            "no-console": "off",
+            "no-unused-vars": "off"
+        }
+    },
+    {
+        files: ["test/integration/**/*.js"],
+        rules: {
+            "no-undef": "off",
             "no-unused-vars": "off"
         }
     },

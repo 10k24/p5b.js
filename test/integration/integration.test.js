@@ -1,4 +1,3 @@
-/* eslint-disable no-undef */
 const { describe, it, expect } = require("bun:test");
 const path = require("path");
 const { P5b } = require("../../p5b");

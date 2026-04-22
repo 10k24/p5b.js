@@ -1,4 +1,3 @@
-/* eslint-disable no-console */
 /**
  * Performance tests for p5b.js toFrame() paths.
  *
@@ -23,10 +22,10 @@ function runBench(p5bInstance) {
         p5bInstance.on("frame", () => {
             count++;
             if (count === WARM_UP) {
-                start = Date.now();
+                start = performance.now();
             }
             if (count === WARM_UP + FRAMES) {
-                const elapsed = Date.now() - start;
+                const elapsed = performance.now() - start;
                 p5bInstance.stop();
                 resolve(elapsed / FRAMES);
             }
