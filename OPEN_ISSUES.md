@@ -1,35 +1,14 @@
 # Open Issues - p5b.js
 
-## Completed & Tested
-
-The following are implemented and have passing test coverage:
-
-- **Math Constants**: PI, TWO_PI, HALF_PI, QUARTER_PI, TAU, DEGREES, RADIANS
-- **Math Functions**: abs, ceil, floor, round, pow, sqrt, exp, log, max, min, sin, cos, tan, asin, acos, atan, atan2, sq, mag, fract
-- **Random/Noise**: random, randomSeed, randomGaussian, noise, noiseSeed, noiseDetail
-- **Utility Functions**: map, lerp, lerpColor, constrain, dist, createVector
-- **String Functions**: nf, nfc, nfp, nfs, join, split, splitTokens, trim
-- **Shape Constants**: CORNER, CORNERS, RADIUS, CENTER, LEFT, RIGHT, TOP, BOTTOM, BASELINE, CLOSE, OPEN, CHORD, PIE, POINTS, LINES, TRIANGLES, etc.
-- **Blend Mode Constants**: BLEND, ADD, REMOVE, DARKEST, LIGHTEST, DIFFERENCE, SUBTRACT, EXCLUSION, MULTIPLY, SCREEN, REPLACE, OVERLAY, HARD_LIGHT, SOFT_LIGHT, DODGE, BURN
-- **Cursor/Input Constants**: ARROW, CROSS, HAND, MOVE, TEXT, WAIT, key codes, arrow keys
-- **Typography Constants**: NORMAL, ITALIC, BOLD, BOLDITALIC, CHAR, WORD
-- **Other Constants**: AUTO, STROKE, FILL, TEXTURE, IMMEDIATE, NEAREST, REPEAT, CLAMP, MIRROR, FLAT, SMOOTH, LANDSCAPE, PORTRAIT
-- **Time Functions**: year(), month(), day(), hour(), minute(), second()
-- **Environment**: frameRate(), loop(), noLoop(), isLooping(), redraw()
-- **Loop lifecycle**: noLoop() in setup, noLoop() in draw, redraw() while stopped, loop()/noLoop() toggle, external control, frameCount preservation
-- **Mode/Style**: rectMode(), ellipseMode(), strokeCap(), strokeJoin()
-- **Typography**: textLeading(), textStyle(), textWidth(), textAlign(), textWrap()
-- **Data/IO**: loadStrings(), loadTable()
-- **Environment (Extended)**: cursor(), noCursor(), pixelDensity(), windowWidth, windowHeight
-- **Accessibility**: describe(), describeElement(), textOutput(), gridOutput() (all noops in headless)
-- **imageMode()**: CORNER, CENTER, CORNERS
-- **drawingContext**: direct Canvas 2D API access after createCanvas()
-
----
-
 ## Next Up (v1.3.0)
 
 These are the top priorities for the next release.
+
+### 0. Global alpha override
+
+Add an `alpha` property and validation int [0, 255] to P5b config.
+
+**Fix:** Reset graphics state (transform, fill, stroke, etc.) when pulling from pool.
 
 ### 1. Graphics Pool State on Reuse
 
