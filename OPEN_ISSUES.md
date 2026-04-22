@@ -1,5 +1,23 @@
 # Open Issues - p5b.js
 
+## Staged Fixes
+
+Fixed and staged for next release.
+
+### `loadImage` Broken in canvas v3
+
+Two bugs in `loadImageData` caused image loading to fail.
+
+**Bug 1 — No `onload` wait:** `drawImage(rawImg)` was called immediately after `rawImg.src = buffer`, before the image finished decoding. canvas v3 decodes asynchronously → `"Image given has not completed loading"`.
+
+**Bug 2 — Wrong ArrayBuffer slice:** `fs.readFileSync` returns a pooled `Buffer`. Passing `buf.buffer` gave canvas the entire memory pool instead of just the file bytes → `"Unsupported image type"`.
+
+**Fix:** Wrap draw logic in `rawImg.onload`; pass `buf.buffer.slice(buf.byteOffset, buf.byteOffset + buf.byteLength)` to isolate file bytes.
+
+**Location:** `p5b.js` — `loadImageData` closure in `global.loadImage` (~line 296)
+
+---
+
 ## Next Up (v1.3.0)
 
 These are the top priorities for the next release.
