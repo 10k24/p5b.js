@@ -56,7 +56,7 @@ async function main() {
         if (!internalCanvas) return;
         
         const pngBuffer = internalCanvas.toBuffer("image/png");
-        const base64 = pngBuffer.toString('base64');
+        const base64 = pngBuffer.toString("base64");
 
         // process.stdout.write(`\x1b_Ga=T,i=1,f=100,c=210,r=70,q=1;${base64}\x1b\\`);
         process.stdout.write(`\x1b_Ga=T,i=1,f=100,c=${cols},r=${rows},q=1;${base64}\x1b\\`);
