@@ -63,3 +63,33 @@ node ex-terminal-cli.js sketch-rings.js
 **Included Sketch:** `sketch-rings.js` - Animated concentric rings pattern
 
 Press `Ctrl+C` to exit.
+
+## Kitty Terminal Example
+
+Renders a p5.js sketch in the Kitty terminal using pixel-accurate graphics protocol.
+
+**Usage:**
+
+```bash
+node ex-kitty-cli.js <sketch-path>
+```
+
+**Example:**
+
+```bash
+node ex-kitty-cli.js sketch-rings.js
+```
+
+**Requirements:**
+- Kitty terminal (other terminals with Kitty graphics protocol support may work)
+- Terminal must report pixel dimensions (not just character grid)
+- `node-termios` package for getting terminal size
+
+**Behavior:**
+- Renders at 50% of terminal pixel resolution for performance
+- Uses Kitty graphics protocol for true pixel-accurate output
+- Frame rate: 60 fps
+
+**Included Sketch:** `sketch-rings.js` - Animated concentric rings pattern
+
+Press `Ctrl+C` to exit.
