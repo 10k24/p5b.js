@@ -1,5 +1,7 @@
 # @10k24/p5b
 
+[![npm](https://img.shields.io/npm/v/@10k24/p5b)](https://www.npmjs.com/package/@10k24/p5b)
+
 Render p5.js sketches to RGBA pixel buffers in Node.js.
 
 NOTE: several features are untested or unsupported, including the following:
@@ -159,6 +161,7 @@ See [examples/](examples/) for runnable examples:
 
 - [examples/ex-file-based.js](examples/ex-file-based.js) — Loading sketch from file
 - [examples/ex-inline.js](examples/ex-inline.js) — Using setup/draw callbacks
+- [examples/ex-kitty-cli.js](examples/ex-kitty-cli.js) — Render a p5.js sketch in the Kitty terminal at pixel resolution.
 - [examples/ex-p5b-zmq.js](examples/ex-p5b-zmq.js) — ZeroMQ frame transport
 - [examples/ex-terminal-cli.js](examples/ex-terminal-cli.js) — Render a p5.js sketch in the terminal using truecolor ANSI half-block characters.
 

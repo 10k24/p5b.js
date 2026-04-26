@@ -1,5 +1,6 @@
 // Render a p5.js sketch in the terminal using truecolor ANSI half-block characters.
 // Works in any truecolor terminal (Ghostty, Kitty, iTerm2, WezTerm, etc.)
+// In Kitty terminal, framerate is extremely high, recommend using ex-kitty-cli.js instead
 const { P5b } = require("../p5b.js");
 
 const sketchPath = process.argv[2];
@@ -28,7 +29,7 @@ process.on("SIGINT", () => {
 const p5b = new P5b({
     width: windowWidth,
     height: windowHeight,
-    framerate: 60,
+    framerate: 30,
     sketchPath: sketchPath
 });
 

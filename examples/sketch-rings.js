@@ -23,7 +23,7 @@ function draw() {
         sqrt(2 * windowHeight * windowHeight)
     );
 
-    const radius = (2 * frameCount) % maxRadius;
+    const radius = (20 * frameCount) % maxRadius;
 
     const cX = windowWidth / 2;
     const cY = windowHeight / 2;
