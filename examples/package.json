@@ -5,6 +5,7 @@
   "private": true,
   "type": "commonjs",
   "dependencies": {
+    "@10k24/p5b": "1.2.2",
     "zeromq": "^6.0.0"
   }
 }

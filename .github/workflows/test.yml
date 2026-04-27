@@ -9,9 +9,13 @@ on:
 jobs:
   test:
     runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        p5-version: [v1, v2]
+    name: test (p5 ${{ matrix.p5-version }})
     steps:
       - uses: actions/checkout@v4
       - uses: oven-sh/setup-bun@v1
       - run: bun install
-      - run: bun test
+      - run: bun run test:${{ matrix.p5-version }}
       - run: bun run lint

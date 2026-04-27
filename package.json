@@ -30,6 +30,9 @@
     ],
     "scripts": {
         "test": "bun test",
+        "test:v1": "P5B_P5_PATH=p5 bun test",
+        "test:v2": "P5B_P5_PATH=p5-v2 bun test",
+        "test:all": "bun run test:v1 && bun run test:v2",
         "test:watch": "bun test --watch",
         "lint": "bunx eslint",
         "fix": "bunx eslint --fix",
@@ -42,18 +45,31 @@
     "type": "commonjs",
     "files": [
         "p5b.js",
+        "p5b-base.js",
+        "p5b_v1.js",
+        "p5b_v2.js",
         "p5b-dom.js",
         "p5b.mjs",
         "README.md",
         "LICENSE"
     ],
+    "peerDependencies": {
+        "p5": "^1.11.0 || ^2.0.0"
+    },
+    "peerDependenciesMeta": {
+        "p5": {
+            "optional": false
+        }
+    },
     "dependencies": {
         "canvas": "^3.2.3",
-        "opentype.js": "^1.3.4",
-        "p5": "^1.11.12"
+        "gl": "^8.1.6",
+        "opentype.js": "^1.3.4"
     },
     "devDependencies": {
         "dot": "^1.1.3",
-        "eslint": "^9.39.0"
+        "eslint": "^9.39.0",
+        "p5": "^1.11.12",
+        "p5-v2": "npm:p5@^2.0.0"
     }
 }

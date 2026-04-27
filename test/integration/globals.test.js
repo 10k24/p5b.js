@@ -1,6 +1,9 @@
 const { describe, it, expect } = require("bun:test");
 const { P5b } = require("../../p5b.js");
 
+// p5 v2 removed string utility functions (join, split, trim) that wrapped native JS equivalents.
+const isP5v2 = (process.env.P5B_P5_PATH || "p5") !== "p5";
+
 describe("P5b Globals - p5.js v1.x Compatibility", () => {
     describe("Trigonometry Constants", () => {
         it("should have PI", (done) => {
@@ -819,7 +822,7 @@ describe("P5b Globals - p5.js v1.x Compatibility", () => {
             p5b.run();
         });
 
-        it("should have join", (done) => {
+        it.skipIf(isP5v2)("should have join", (done) => {
             const p5b = new P5b({
                 width: 16, height: 16,
                 setup: () => {
@@ -831,11 +834,35 @@ describe("P5b Globals - p5.js v1.x Compatibility", () => {
             p5b.run();
         });
 
-        it("should have split", (done) => {
+        it.skipIf(!isP5v2)("v2: join removed from globals", (done) => {
+            const p5b = new P5b({
+                width: 16, height: 16,
+                setup: () => {
+                    expect(global.join).toBeUndefined();
+                },
+                draw: () => { background(0); noLoop(); }
+            });
+            p5b.on("frame", () => { p5b.stop(); done(); });
+            p5b.run();
+        });
+
+        it.skipIf(isP5v2)("should have split", (done) => {
             const p5b = new P5b({
                 width: 16, height: 16,
                 setup: () => {
                     expect(global.split).toBeDefined();
+                },
+                draw: () => { background(0); noLoop(); }
+            });
+            p5b.on("frame", () => { p5b.stop(); done(); });
+            p5b.run();
+        });
+
+        it.skipIf(!isP5v2)("v2: split removed from globals", (done) => {
+            const p5b = new P5b({
+                width: 16, height: 16,
+                setup: () => {
+                    expect(global.split).toBeUndefined();
                 },
                 draw: () => { background(0); noLoop(); }
             });
@@ -855,11 +882,23 @@ describe("P5b Globals - p5.js v1.x Compatibility", () => {
             p5b.run();
         });
 
-        it("should have trim", (done) => {
+        it.skipIf(isP5v2)("should have trim", (done) => {
             const p5b = new P5b({
                 width: 16, height: 16,
                 setup: () => {
                     expect(global.trim).toBeDefined();
+                },
+                draw: () => { background(0); noLoop(); }
+            });
+            p5b.on("frame", () => { p5b.stop(); done(); });
+            p5b.run();
+        });
+
+        it.skipIf(!isP5v2)("v2: trim removed from globals", (done) => {
+            const p5b = new P5b({
+                width: 16, height: 16,
+                setup: () => {
+                    expect(global.trim).toBeUndefined();
                 },
                 draw: () => { background(0); noLoop(); }
             });

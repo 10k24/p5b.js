@@ -44,7 +44,7 @@ class P5bDOM {
 
         // Absorbs unguarded el.parentNode.removeChild(el) calls from p5.js internals
         // when an element has no real parent (matches silent browser behavior).
-        const detachedParent = { removeChild: noop, appendChild: noop };
+        const detachedParent = { removeChild: noop, appendChild: noop, insertBefore: noop };
 
         const makeStubElement = (tag) => {
             const el = {
@@ -84,7 +84,64 @@ class P5bDOM {
             c.dispatchEvent = () => true;
             c.getBoundingClientRect = () => ({ left: 0, top: 0, width: c.width, height: c.height, right: c.width, bottom: c.height });
             c.parentNode = detachedParent;
+            // parentElement mirrors parentNode so RendererGL's textCanvas insertion
+            // (this.canvas.parentElement.insertBefore) always has a valid target.
+            Object.defineProperty(c, "parentElement", {
+                get: () => c.parentNode,
+                configurable: true,
+            });
             c.style = {};
+
+            // Intercept WebGL context requests and satisfy them with headless-gl.
+            // The `canvas` package only provides 2D contexts; headless-gl provides
+            // real WebGL 1/2 via native bindings so p5.js WEBGL mode works headlessly.
+            const origGetContext = c.getContext.bind(c);
+            c.getContext = (type, attrs) => {
+                // headless-gl only supports WebGL 1. Return null for webgl2
+                // so p5.js falls back to requesting webgl (WebGL 1).
+                if (type === "webgl2") return null;
+                if (type === "webgl" || type === "webgl-strict") {
+                    if (!c._glCtx) {
+                        const gl = require("gl");
+                        c._glCtx = gl(c.width, c.height, { preserveDrawingBuffer: true });
+                    }
+                    return c._glCtx;
+                }
+                return origGetContext(type, attrs);
+            };
+
+            // Intercept canvas width/height writes so that when p5.js resizes the
+            // canvas (e.g. after createCanvas(w, h, WEBGL)), the headless-gl
+            // drawingbuffer is resized to match via the STACKGL extension.
+            let _w = c.width, _h = c.height;
+            Object.defineProperty(c, "width", {
+                get: () => _w,
+                set: (v) => {
+                    _w = v;
+                    // Resize underlying node-canvas buffer too
+                    const desc = Object.getOwnPropertyDescriptor(Object.getPrototypeOf(c), "width");
+                    if (desc && desc.set) desc.set.call(c, v);
+                    if (c._glCtx) {
+                        const ext = c._glCtx.getExtension("STACKGL_resize_drawingbuffer");
+                        if (ext) ext.resize(_w, _h);
+                    }
+                },
+                configurable: true,
+            });
+            Object.defineProperty(c, "height", {
+                get: () => _h,
+                set: (v) => {
+                    _h = v;
+                    const desc = Object.getOwnPropertyDescriptor(Object.getPrototypeOf(c), "height");
+                    if (desc && desc.set) desc.set.call(c, v);
+                    if (c._glCtx) {
+                        const ext = c._glCtx.getExtension("STACKGL_resize_drawingbuffer");
+                        if (ext) ext.resize(_w, _h);
+                    }
+                },
+                configurable: true,
+            });
+
             allCanvases.push(c);
             return c;
         };
@@ -103,6 +160,7 @@ class P5bDOM {
                     spliceFrom(allCanvases, el);
                     return el;
                 },
+                insertBefore: (el, _ref) => { bodyChildren.push(el); if (el && typeof el === "object") { el.parentNode = document.body; el.parentElement = document.body; } return el; },
                 style: {},
                 classList: { add: noop, remove: noop, contains: () => false, toggle: noop },
                 clientWidth: this.width,
@@ -128,6 +186,8 @@ class P5bDOM {
                 return bodyChildren.filter((el) => el.tagName && el.tagName.toLowerCase() === t);
             },
             documentElement: { style: {}, classList: { add: noop, remove: noop, contains: () => false }, clientWidth: this.width, clientHeight: this.height },
+            scripts: [],
+            fonts: { add: noop, ready: Promise.resolve(), values: () => [][Symbol.iterator]() },
             readyState: "complete",
             addEventListener: noop,
             removeEventListener: noop,
@@ -162,7 +222,24 @@ class P5bDOM {
             fetch: global.fetch,
         };
 
-        global.window = win;
+        // Wrap win in a Proxy so p5.js strands can temporarily inject shader
+        // hook functions (e.g. getPixelInputs) via `window[name] = fn`.
+        // In a browser these land on the real global; here we forward them to
+        // Node.js's global so they're accessible as bare names inside modify().
+        const knownWinKeys = new Set(Object.keys(win));
+        global.window = new Proxy(win, {
+            set(target, key, value) {
+                target[key] = value;
+                // Forward non-window-specific properties to Node.js global so
+                // shader hook names are accessible as unqualified identifiers.
+                if (!knownWinKeys.has(key)) global[key] = value;
+                return true;
+            },
+            get(target, key) {
+                if (key in target) return target[key];
+                return global[key];
+            },
+        });
         global.document = document;
         global.screen = win.screen;
 
@@ -180,6 +257,40 @@ class P5bDOM {
         global.cancelAnimationFrame = (id) => clearImmediate(id);
         global.Event = win.Event;
         global.MouseEvent = win.MouseEvent;
+        // Stub browser font-loading API used by p5 v2's Font constructor
+        global.FontFace = class FontFace { constructor(family) { this.family = family; } };
+        // Stub XMLHttpRequest for font loading in headless environment
+        const fs = require("fs");
+        global.XMLHttpRequest = class XMLHttpRequest {
+            constructor() {
+                this.readyState = 0;
+                this.status = 0;
+                this.response = null;
+            }
+            open(method, url) {
+                this.method = method;
+                this.url = url;
+                this.readyState = 1;
+            }
+            send(_body) {
+                try {
+                    const resolvedPath = this.url.replace(/^file:\/\//, "");
+                    const data = fs.readFileSync(resolvedPath);
+                    // Create a copy of the buffer to avoid shared memory issues
+                    this.response = Buffer.from(data).buffer;
+                    this.readyState = 4;
+                    this.status = 200;
+                    if (this.onload) this.onload();
+                } catch (e) {
+                    this.readyState = 4;
+                    this.status = 404;
+                    if (this.onerror) this.onerror(e);
+                }
+            }
+            setRequestHeader() {}
+            addEventListener() {}
+            getResponseHeader() { return null; }
+        };
 
     }
 }

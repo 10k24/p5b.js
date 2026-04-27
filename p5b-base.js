@@ -1,0 +1,69 @@
+const { EventEmitter } = require("events");
+const { P5bDOM } = require("./p5b-dom");
+
+const noop = () => {};
+
+// TODO: function? for any global functions to exec outside of preload/setup/draw?
+const P5B_DEFAULTS = {
+    sketchPath: null,
+    width: 32,
+    height: 32,
+    fps: 60,
+    preload: noop,
+    setup: noop,
+    draw: noop
+};
+
+class P5bBase extends EventEmitter {
+    constructor(config = {}) {
+        super();
+        Object.assign(this, P5B_DEFAULTS, config);
+        this._myP5 = null;
+        this._destCanvas = null;
+        this._gfxPool = new Map();
+        this._gfxActive = [];
+        this._redrawing = false;
+        this._removed = false;
+        this._metrics = {
+            framesDrawn: 0,
+            errors: 0
+        };
+        this._validateConfig();
+        this._dom = new P5bDOM(this.width, this.height);
+    }
+
+    getMetrics() {
+        return this._metrics;
+    }
+
+    _emitRuntimeError(error, phase) {
+        this._metrics.errors++;
+        this.emit("error", { phase, error });
+    }    
+
+    _validateConfig() {
+        if (!Number.isFinite(this.fps) || this.fps <= 0) {
+            throw new Error("Invalid config: fps must be a positive number.");
+        }
+        if (!Number.isInteger(this.width) || this.width <= 0) {
+            throw new Error("Invalid config: width must be a positive integer.");
+        }
+        if (!Number.isInteger(this.height) || this.height <= 0) {
+            throw new Error("Invalid config: height must be a positive integer.");
+        }
+        if (this.preload && typeof this.preload !== "function") {
+            throw new Error("Invalid config: preload must be a function.");
+        }
+        if (this.setup && typeof this.setup !== "function") {
+            throw new Error("Invalid config: setup must be a function.");
+        }
+        if (this.draw && typeof this.draw !== "function") {
+            throw new Error("Invalid config: draw must be a function.");
+        }
+
+        global.setup = this.setup;
+        global.draw = this.draw;
+    }
+}
+
+module.exports = { P5bBase, P5B_DEFAULTS };

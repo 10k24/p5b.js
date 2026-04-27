@@ -2,8 +2,20 @@
 
 Render p5.js sketches to RGBA pixel buffers in Node.js.
 
-NOTE: several features are untested or unsupported, including the following:
-- p5.js v2.x
+## p5.js Compatibility
+
+| p5.js version | Status |
+|---|---|
+| v1.9+ | Fully supported |
+| v2.x | Supported (see limitations below) |
+
+**p5.js v2 limitations** — the following v2 features do not work in headless mode:
+- `beginShape` / `endShape` / `vertex` — p5 v2 uses `Path2D` (browser-only API) internally; these will throw
+- `colorMode(HSB)` — rendering output differs from v1 due to p5 v2's new color system
+- `join()`, `split()`, `trim()` global helpers — removed in p5 v2; use native JS equivalents
+- `loadTable()` + `getString(columnName)` — p5 v2 `TableRow` has a known upstream bug with string column lookups
+
+NOTE: the following are unsupported in all versions:
 - webgl
 - shaders
 - video
@@ -180,6 +192,24 @@ This scales the canvas to the largest integer multiple that fits the window — 
 ## Transport Layer
 
 For streaming frames to external systems, see [examples/ex-p5b-zmq.js](examples/ex-p5b-zmq.js) for a ZeroMQ adapter reference.
+
+## p5.js Version Selection
+
+By default p5b loads whichever `p5` package is installed. Set `P5B_P5_PATH` to use a different package name:
+
+```bash
+P5B_P5_PATH=p5-v2 node my-sketch.js
+```
+
+**p5.js v2 async setup:** p5 v2 removed the `preload()` lifecycle. p5b wraps your `preload()` inside an `async setup()` automatically, so existing v1 sketches work unchanged. For new v2-style sketches, use `async setup()` directly:
+
+```javascript
+async function setup() {
+    const img = await loadImage("photo.png");
+    createCanvas(400, 400);
+    image(img, 0, 0);
+}
+```
 
 ## Environment
 
