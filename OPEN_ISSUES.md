@@ -1,5 +1,7 @@
 # Open Issues - p5b.js
 
+- [ ] p1 bug: ex-terminal-cli.js runs at extremely high framerate, regardless of p5b framerate value
+
 ## Completed & Tested
 
 The following are implemented and have passing test coverage:
