@@ -1,7 +1,8 @@
 const { describe, it, expect } = require("bun:test");
 const { P5b } = require("../../p5b.js");
 
-// p5 v2 removed string utility functions (join, split, trim) that wrapped native JS equivalents.
+// p5 v2 removed string utility functions (join, split, trim) that wrapped native JS
+// equivalents. P5b shims them back to v1 semantics in v2 mode.
 const isP5v2 = (process.env.P5B_P5_PATH || "p5") !== "p5";
 
 describe("P5b Globals - p5.js v1.x Compatibility", () => {
@@ -834,11 +835,11 @@ describe("P5b Globals - p5.js v1.x Compatibility", () => {
             p5b.run();
         });
 
-        it.skipIf(!isP5v2)("v2: join removed from globals", (done) => {
+        it.skipIf(!isP5v2)("v2: join shimmed with v1 semantics", (done) => {
             const p5b = new P5b({
                 width: 16, height: 16,
                 setup: () => {
-                    expect(global.join).toBeUndefined();
+                    expect(global.join(["a", "b", "c"], "-")).toBe("a-b-c");
                 },
                 draw: () => { background(0); noLoop(); }
             });
@@ -858,11 +859,11 @@ describe("P5b Globals - p5.js v1.x Compatibility", () => {
             p5b.run();
         });
 
-        it.skipIf(!isP5v2)("v2: split removed from globals", (done) => {
+        it.skipIf(!isP5v2)("v2: split shimmed with v1 semantics", (done) => {
             const p5b = new P5b({
                 width: 16, height: 16,
                 setup: () => {
-                    expect(global.split).toBeUndefined();
+                    expect(global.split("a,b,c", ",")).toEqual(["a", "b", "c"]);
                 },
                 draw: () => { background(0); noLoop(); }
             });
@@ -894,11 +895,12 @@ describe("P5b Globals - p5.js v1.x Compatibility", () => {
             p5b.run();
         });
 
-        it.skipIf(!isP5v2)("v2: trim removed from globals", (done) => {
+        it.skipIf(!isP5v2)("v2: trim shimmed with v1 semantics", (done) => {
             const p5b = new P5b({
                 width: 16, height: 16,
                 setup: () => {
-                    expect(global.trim).toBeUndefined();
+                    expect(global.trim("  x  ")).toBe("x");
+                    expect(global.trim([" a ", " b "])).toEqual(["a", "b"]);
                 },
                 draw: () => { background(0); noLoop(); }
             });

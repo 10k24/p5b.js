@@ -10,7 +10,7 @@ describe("API Compatibility: loadJSON", () => {
         let loaded = null;
         const p5b = new P5b({
             preload: async function() {
-                loaded = await loadJSON("test-data.json");
+                loaded = await loadJSON(testJsonPath);
             },
             setup: function() {},
             draw: function() {}
@@ -31,7 +31,7 @@ describe("API Compatibility: loadJSON", () => {
         const p5b = new P5b({
             preload: async function() {
                 try {
-                    await loadJSON("does-not-exist.json");
+                    await loadJSON(path.join(process.cwd(), "does-not-exist.json"));
                 } catch (e) {
                     error = e;
                 }
@@ -101,7 +101,7 @@ describe("API Compatibility: Mouse/Keyboard Properties", () => {
 
 describe("API Compatibility: loadImage", () => {
     it("should load a local image file", (done) => {
-        const testImagePath = path.join("test/fixtures/img", "natalie-kinnear-CC2Bfvk2-tU-unsplash.jpg");
+        const testImagePath = path.join(process.cwd(), "test/fixtures/img", "natalie-kinnear-CC2Bfvk2-tU-unsplash.jpg");
         let loadedImg = null;
         const p5b = new P5b({
             preload: function() {
@@ -121,7 +121,7 @@ describe("API Compatibility: loadImage", () => {
     });
 
     it("should load a local PNG file with correct pixel data", (done) => {
-        const testImagePath = path.join("test/fixtures/img", "test-red-pixel.png");
+        const testImagePath = path.join(process.cwd(), "test/fixtures/img", "test-red-pixel.png");
         let loadedImg = null;
         const p5b = new P5b({
             preload: function() {

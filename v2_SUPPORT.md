@@ -1,19 +1,19 @@
 # p5.js v2.x Support Notes
 
-## Context
+## Status
 
-p5b.js currently targets p5 v1.11.x. p5.js v2 (v2.2.3) is a major architectural rewrite. This document captures the audit findings and implementation plan for backwards-compatible v2 support.
+p5b supports p5 v1.11.x and p5 v2.2.x via two adapters — `p5b_v1.js` and `p5b_v2.js`. Adapter selection is by package name via the `P5B_P5_PATH` env var ("p5" → v1, "p5-v2" → v2). v2 support is verified by `bun run test:v2` and the CI matrix.
 
 ---
 
 ## Breaking Changes (v1 → v2) Relevant to p5b
 
-| API | v1 | v2 | p5b Impact |
-|-----|----|----|-----------|
-| `_incrementPreload()` / `_decrementPreload()` | Static methods on p5 | **Removed** | Critical — used in all 4 load* functions |
-| Module format | CJS/UMD | ES Module | Requires updated require() logic |
-| Addon registration | `p5.prototype.x = fn` | `p5.registerAddon()` | No direct p5b impact |
-| File loading lifecycle | preload counter | native async/await | Requires conditional code path |
+| API | v1 | v2 | p5b Impact | Status |
+|-----|----|----|-----------|--------|
+| `_incrementPreload()` / `_decrementPreload()` | Static methods on p5 | **Removed** | Critical — used in all 4 load* functions | Handled — v2 wrapper tracks `_pendingLoads` (`p5b_v2.js`) |
+| Module format | CJS/UMD | ES Module | Requires updated require() logic | Handled — `require(pkg).default \|\| require(pkg)` |
+| Addon registration | `p5.prototype.x = fn` | `p5.registerAddon()` | No direct p5b impact | — |
+| File loading lifecycle | preload counter | native async/await | Requires conditional code path | Handled — p5b wraps user `preload()` inside an async setup shim; `_waitForPreloads()` blocks setup until loads settle |
 
 ## Still Compatible in v2
 
@@ -21,125 +21,60 @@ p5b.js currently targets p5 v1.11.x. p5.js v2 (v2.2.3) is a major architectural 
 
 ---
 
-## Implementation Plan
+## Adapter Selection (`p5b.js`)
 
-### 1. Dependency management — `package.json`
+Selection is a package-name convention, not version sniffing:
 
-Move `p5` from `dependencies` to `peerDependencies`. Ship both versions as `devDependencies`.
-
-```json
-"peerDependencies": {
-  "p5": ">=1.11.0 <3.0.0"
-},
-"peerDependenciesMeta": {
-  "p5": { "optional": false }
-},
-"devDependencies": {
-  "p5": "^1.11.12",
-  "p5-v2": "npm:p5@^2.0.0"
-}
+```js
+const { P5b, P5B_DEFAULTS } = p5pkg === "p5-v2"
+    ? require("./p5b_v2")
+    : require("./p5b_v1");
 ```
 
-Pattern: same approach used by React testing libraries, Storybook, and ESLint plugins that support multiple host versions.
+The previously planned `_detectP5Version()` helper was dropped by design: reading the p5 major version would require either `require("${pkg}/package.json")` (blocked by p5 v2's `exports` map under Node) or loading the full p5 module at import time. Name mapping avoids both. Each wrapper's `_loadP5()` reads `P5B_P5_PATH` itself.
 
-### 2. Version detection — inside `p5b.js`
+## Preload / Asset Loading
 
-Add `_detectP5Version(p5)` helper after `_loadP5()` resolves:
+- **v2 wrapper** (`p5b_v2.js`): `_preloadIncrement()` / `_preloadDecrement()` maintain `_pendingLoads`; `_waitForPreloads()` polls until it drains (with a 10s timeout). The setup shim invokes the user `preload()` then awaits `_waitForPreloads()` before calling the user `setup()`.
+- **v1 wrapper** (`p5b_v1.js`): uses p5 v1's native `_incrementPreload()` / `_decrementPreload()`.
 
-```javascript
-_detectP5Version(p5) {
-    const ver = p5.VERSION || "0.0.0";
-    const major = parseInt(ver.split(".")[0], 10);
-    return major; // 1 or 2
-}
-```
+No runtime `this._p5Major` branching was needed — each adapter is version-specific.
 
-Store result as `this._p5Major` on the P5b instance.
+## Dependency Management
 
-### 3. Preload adapter — replace `_incrementPreload` / `_decrementPreload`
+Done:
 
-In v2, sketches use `async setup()` instead of preload counter. Add adapter methods:
+- `p5` moved from `dependencies` to `peerDependencies` (`"^1.11.0 || ^2.0.0"`).
+- Both versions shipped as `devDependencies`: `p5` (^1.11.12) and `p5-v2` (`npm:p5@^2.0.0`).
 
-```javascript
-_preloadIncrement() {
-    if (this._p5Major < 2) {
-        this._myP5._incrementPreload();
-    } else {
-        this._pendingLoads = (this._pendingLoads || 0) + 1;
-    }
-}
+## Tests
 
-_preloadDecrement() {
-    if (this._p5Major < 2) {
-        this._myP5._decrementPreload();
-    } else {
-        this._pendingLoads = Math.max(0, (this._pendingLoads || 1) - 1);
-    }
-}
-```
+- Scripts: `test:v1`, `test:v2`, `test:all` (both, sequentially).
+- CI (`.github/workflows/test.yml`) runs a `[v1, v2]` matrix.
+- Tests detect the active version via `P5B_P5_PATH` (e.g. `isP5v2` in `test/integration/globals.test.js` and `integration.test.js`). The version-loop harness originally planned for `test/helpers/p5-versions.js` was not built — env-driven detection is simpler and was used instead.
 
-Replace all 8 direct callsites in `p5b.js`:
-- `loadImage` (~lines 290, 304, 308)
-- `loadJSON` (~lines 332-368)
-- `loadStrings` (~lines 574, 584, 587)
-- `loadTable` (~lines 597, 648, 651)
+## Docs
 
-### 4. ESM import fix — `_loadP5()`
-
-v2 ships as pure ESM. Add `P5B_P5_PATH` env var support and optional `p5Path` constructor option:
-
-```javascript
-_loadP5() {
-    const pkg = process.env.P5B_P5_PATH || this._options.p5Path || "p5";
-    return require(pkg).default || require(pkg);
-}
-```
-
-Also check if p5 v2 ships a CJS build in `dist/` — if so, require it directly.
-
-### 5. Dynamic test suite
-
-**Pattern:** parameterized runner (used by Babel, ESLint, TypeScript for multi-version testing).
-
-`test/helpers/p5-versions.js`:
-```javascript
-const versions = [
-    { label: "p5 v1", pkg: "p5" },
-    { label: "p5 v2", pkg: "p5-v2" },
-];
-module.exports = versions;
-```
-
-New npm scripts:
-```json
-"test:v1": "P5B_P5_PATH=p5 bun test",
-"test:v2": "P5B_P5_PATH=p5-v2 bun test",
-"test:all": "bun run test:v1 && bun run test:v2"
-```
-
-Wrap existing test files with a version loop using `P5B_P5_PATH` injection — no Bun module cache hacks needed.
-
-### 6. README + CHANGELOG
-
-- Remove "p5.js v2.x (unsupported/untested)" from unsupported list
-- Add compatibility table: v1.9+, v2.x
-- Document `P5B_P5_PATH` env var
-- Note async `setup()` as preferred pattern for asset loading in v2
+- README: compatibility table, `P5B_P5_PATH` documentation, v2 limitations list, and async `setup()` note. Done.
 
 ---
 
-## Files to Modify
+## Decisions
 
-| File | Change |
-|------|--------|
-| `package.json` | peerDeps, devDeps for both versions, new test scripts |
-| `p5b.js` | `_detectP5Version`, `_preloadIncrement/Decrement`, `_loadP5` env var support |
-| `test/helpers/p5-versions.js` | New — version list |
-| `test/p5b.test.js` | Version loop |
-| `test/api-compat.test.js` | Version loop |
-| `test/integration/*.test.js` | Version loop |
-| `README.md` | Remove v2 from unsupported, add compat table |
-| `CHANGELOG.md` | Document v2 support |
+- No `p5Path` constructor option — `P5B_P5_PATH` env var only. (The constructor option originally planned for `_loadP5()` was intentionally dropped.)
+- No CHANGELOG entry for v2 support.
+
+## Remaining Work
+
+- **Align `p5b_v2.js` naming with `p5b_v1.js`** — reconcile variable names and convenience-variable assignments in `p5b_v2.js` to match `p5b_v1.js` so the two adapters stay structurally parallel and diffs between them stay small. Investigate a static-analysis approach (e.g. a diff/structural-comparison script) to keep drift in check. **Do not modify `p5b_v1.js`.**
+- p5b_v2.js: need async/await support in v2 API; only do this once all other work is addressed for v2
+
+### Addressed (2026-08-12)
+
+- `colorMode(HSB)` — was: p5 v2 serializes HSB colors as CSS Color 4 percentage `rgb()` (e.g. `rgb(100% 0% 0%)`), which node-canvas's color parser rejects (silently defaulting to transparent black). Now: p5b normalizes percentage `rgb()/rgba()` to numeric form in the node-canvas `fillStyle`/`strokeStyle` setters, matching what p5 v2 expects the browser canvas to accept. HSB `fill`/`stroke`/`background` now render identically to v1.
+- `beginShape`/`endShape`/`vertex` — was: v2 renders custom shapes via `Path2D` (browser-only), which threw. Now: p5b polyfills `Path2D` and patches node-canvas's `CanvasRenderingContext2D` fill/stroke/clip to replay recorded path commands. Also unlocks `clip()`/`beginClip()`/`endClip()`. (The `Path2D` and color-normalization patches live in `p5b-dom.js`, installed only for p5 v2 via the `p5Major` option.)
+- `join()`/`split()`/`trim()` globals — was: removed in p5 v2. Now: shimmed to v1 semantics in `_bindGlobals`.
+- `loadTable()` + string column lookups — was: v2 `TableRow.get/getNum/getString` read `obj[columns.indexOf(column)]`, returning stale values after `set()`. Now: p5b patches `TableRow.prototype` to read `obj[column]` and seeds name-keyed entries in loaded rows.
 
 ---
 
@@ -150,3 +85,5 @@ Wrap existing test files with a version loop using `P5B_P5_PATH` injection — n
 3. Manual: sketch using `loadImage` in `preload()` works under v1
 4. Manual: sketch using `async setup()` with `await loadImage()` works under v2
 5. `P5B_P5_PATH=p5-v2 bun test test/integration/sketches.test.js` passes
+
+All items currently pass.

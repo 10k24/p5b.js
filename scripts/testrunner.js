@@ -6,5 +6,7 @@ if (result.status !== 0) {
     process.exit(1);
 }
 
+global.mocha = true;
+
 spawnSync("bun", ["run", "docs"], { stdio: "inherit" });
 console.log("Preload complete");

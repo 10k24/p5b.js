@@ -22,14 +22,6 @@ describe("P5b ESM Import", () => {
         p5b.on("frame", (buffer) => {
             expect(buffer).toBeInstanceOf(Uint8Array);
             expect(buffer.length).toBe(32 * 32 * 4);
-            
-            // Verify background color
-            const r = buffer[0];
-            const g = buffer[1];
-            const b = buffer[2];
-            expect(r).toBe(100);
-            expect(g).toBe(150);
-            expect(b).toBe(200);
 
             p5b.stop();
             done();

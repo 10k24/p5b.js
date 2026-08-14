@@ -7,13 +7,15 @@ Render p5.js sketches to RGBA pixel buffers in Node.js.
 | p5.js version | Status |
 |---|---|
 | v1.9+ | Fully supported |
-| v2.x | Supported (see limitations below) |
+| v2.x | Supported (see v2 notes below) |
 
-**p5.js v2 limitations** — the following v2 features do not work in headless mode:
-- `beginShape` / `endShape` / `vertex` — p5 v2 uses `Path2D` (browser-only API) internally; these will throw
-- `colorMode(HSB)` — rendering output differs from v1 due to p5 v2's new color system
-- `join()`, `split()`, `trim()` global helpers — removed in p5 v2; use native JS equivalents
-- `loadTable()` + `getString(columnName)` — p5 v2 `TableRow` has a known upstream bug with string column lookups
+**p5.js v2 shims** — p5b patches these v2 differences to match v1 behavior:
+- `beginShape` / `endShape` / `vertex` — p5 v2 renders custom shapes via `Path2D` (browser-only); p5b polyfills `Path2D` and replays it through node-canvas path commands
+- `colorMode(HSB)` — p5 v2 emits CSS Color 4 percentage `rgb()` strings that node-canvas rejects; p5b normalizes them at the canvas boundary so HSB colors render like v1
+- `join()`, `split()`, `trim()` global helpers — removed in p5 v2; p5b shims them to v1 semantics
+- `loadTable()` string column lookups — p5 v2 `TableRow` reads the wrong slot after `set()`; p5b patches it to v1 semantics
+
+**p5.js v2 differences** — inherent to p5 v2, not p5b defects:
 
 NOTE: the following are unsupported in all versions:
 - webgl

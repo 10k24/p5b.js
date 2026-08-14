@@ -2,14 +2,16 @@ const canvas = require("canvas");
 const fs = require("fs");
 const path = require("path");
 const vm = require("vm");
-// const opentype = require("opentype.js");
-const { P5bBase, P5B_DEFAULTS } = require("./p5b-base");
+const opentype = require("opentype.js");
+const { P5bBase, P5B_DEFAULTS, reorderBuffer } = require("./p5b-base");
 
 const noop = () => {};
 
+// TODO: need async/await support in v2 API
+
 class P5b extends P5bBase {
     constructor(config = {}) {
-        super(config);
+        super({ ...config, p5Major: 2 });
         this._pendingLoads = 0;
     }
 
@@ -43,7 +45,8 @@ class P5b extends P5bBase {
                 load() { return Promise.resolve(this); }
             };
         }
-        const p5 = require("p5").default || require("p5");
+        const p5pkg = process.env.P5B_P5_PATH || "p5";
+        const p5 = require(p5pkg).default || require(p5pkg);
         // Disable p5.js 2.x FES features that require a real browser environment
         // (sketch_verifier fetches <script> tags; fes_core checks for removed APIs).
         // Neither is meaningful in a headless Node.js context.
@@ -66,7 +69,13 @@ class P5b extends P5bBase {
     _trackNewGraphics(ret, key) {
         // v2: createGraphics no longer pushes to _elements, so pool via remove() override
         if (!this._gfxPool.has(key)) this._gfxPool.set(key, []);
-        ret.remove = () => this._gfxPool.get(key).push(ret);
+        ret.remove = () => {
+            if (ret.elt && ret.elt.parentNode) {
+                ret.elt.parentNode.removeChild(ret.elt);
+            }
+            if (ret.elt) this._dom.removeTrackedCanvas(ret.elt);
+            this._gfxPool.get(key).push(ret);
+        };
     }
 
     _preloadIncrement() {
@@ -75,6 +84,20 @@ class P5b extends P5bBase {
 
     _preloadDecrement() {
         this._pendingLoads = Math.max(0, this._pendingLoads - 1);
+    }
+
+    _waitForPreloads(timeoutMs = 10000) {
+        const startedAt = Date.now();
+        return new Promise((resolve, reject) => {
+            const poll = () => {
+                if (this._pendingLoads <= 0) return resolve();
+                if (Date.now() - startedAt >= timeoutMs) {
+                    return reject(new Error(`Timed out waiting for preload to finish (${timeoutMs}ms). ${this._pendingLoads} load(s) pending.`));
+                }
+                setImmediate(poll);
+            };
+            poll();
+        });
     }
 
     run() {
@@ -123,6 +146,7 @@ class P5b extends P5bBase {
         this.remove();
     }
 
+    // TODO: need align variable names to v1
     toFrame() {
         const srcCanvas = this._myP5?.canvas;
         if (!srcCanvas) {
@@ -162,8 +186,14 @@ class P5b extends P5bBase {
 
         const ctx = this._destCanvas.getContext("2d");
 
-        // Stretch source to fill destination exactly.
-        ctx.drawImage(srcDrawable, 0, 0, srcW, srcH, 0, 0, this.width, this.height);
+        // Fit to destination preserving aspect ratio, top-left aligned (do not stretch).
+        // The region outside the fitted frame stays transparent (blank filler).
+        const scaleFactor = Math.min(this.width / srcW, this.height / srcH);
+        ctx.drawImage(
+            srcDrawable,
+            0, 0, srcW, srcH,
+            0, 0, srcW * scaleFactor, srcH * scaleFactor
+        );
 
         if (isP3D) {
             // getImageData returns RGBA — no channel reorder needed.
@@ -171,12 +201,14 @@ class P5b extends P5bBase {
         }
 
         // node-canvas toBuffer("raw") returns BGRA; swap to RGBA.
-        const raw = this._destCanvas.toBuffer("raw");
-        const out = new Uint8Array(raw);
-        for (let i = 0; i < out.length; i += 4) {
-            const b = out[i]; out[i] = out[i + 2]; out[i + 2] = b;
-        }
-        return out;
+        // const raw = this._destCanvas.toBuffer("raw");
+        // const out = new Uint8Array(raw);
+        // for (let i = 0; i < out.length; i += 4) {
+        //     const b = out[i]; out[i] = out[i + 2]; out[i + 2] = b;
+        // }
+        // return out;
+
+        return reorderBuffer(this._destCanvas.toBuffer("raw"));
     }
 
     _initSketch() {
@@ -185,8 +217,17 @@ class P5b extends P5bBase {
         // p5.js 2.x removed preload() — do not assign it on the p5 instance or
         // the FES will throw before setup runs. If the user provided a preload
         // function, invoke it synchronously before setup as a best-effort shim.
-        const userPreload = this.preload;
-        const hasUserPreload = typeof userPreload === "function" && userPreload !== noop;
+        // Config preload wins; for sketchPath mode the sketch's own preload is
+        // written to global.preload by vm.runInThisContext() in _bindGlobals().
+        // Compare against P5B_DEFAULTS.preload (not this module's noop) so the
+        // default no-op preload isn't mistaken for a user-provided one.
+        const userPreload = (typeof this.preload === "function" && this.preload !== P5B_DEFAULTS.preload)
+            ? this.preload
+            // Only sketchPath mode writes the sketch's preload to global.preload (via vm).
+            // Gating on sketchPath prevents a stale preload from a prior sketchPath instance
+            // leaking into inline-config instances when test files share one process.
+            : (this.sketchPath && typeof global.preload === "function" ? global.preload : this.preload);
+        const hasUserPreload = typeof userPreload === "function" && userPreload !== P5B_DEFAULTS.preload;
 
         this._myP5.setup = async () => {
             if (hasUserPreload) {
@@ -197,6 +238,9 @@ class P5b extends P5bBase {
                 }
             }
             try {
+                // Wait for pending preload loads (loadImage/loadStrings/loadTable) to settle
+                // before running setup, preserving the v1-style sync-shell contract.
+                await this._waitForPreloads();
                 // Await in case sketch setup is async (e.g. uses await loadFont())
                 await global.setup();
             } catch (error) {
@@ -206,12 +250,29 @@ class P5b extends P5bBase {
         };
 
         global.redraw = (...args) => {
+            // p5 2.x redraw() is async: it awaits lifecycle hooks before calling draw(),
+            // so the _redrawing flag must stay set until the redraw settles. Otherwise the
+            // stopped-state guard in _wrappedDraw would block the redraw frame entirely.
             this._redrawing = true;
-            try { this._myP5.redraw(...args); }
-            finally { this._redrawing = false; }
+            try {
+                const result = this._myP5.redraw(...args);
+                if (result && typeof result.then === "function") {
+                    return result.finally(() => { this._redrawing = false; });
+                }
+                this._redrawing = false;
+                return result;
+            } catch (error) {
+                this._redrawing = false;
+                throw error;
+            }
         };
 
-        this._myP5.draw = () => {
+        // p5 v2 may call global.draw() directly; wrap user draw in global.draw so errors
+        // are caught regardless of which code path p5 uses to invoke draw.
+        // Capture after _bindGlobals() runs (sketch may have overwritten global.draw via vm).
+        const _userDraw = global.draw;
+        const _wrappedDraw = () => {
+            if (!this._myP5) return;
             try {
                 // Block animation loop calls when stopped, but always allow redraw() through
                 if (!this._redrawing && this._metrics.framesDrawn > 0 && !this._myP5.isLooping()) {
@@ -219,7 +280,7 @@ class P5b extends P5bBase {
                 }
 
                 const elemsBefore = this._myP5._elements.length;
-                global.draw();
+                _userDraw.call(this._myP5);
 
                 // Return pool-checked-out graphics objects back to the pool
                 for (const { pg, key } of this._gfxActive) {
@@ -248,6 +309,8 @@ class P5b extends P5bBase {
                 this.stop();
             }
         };
+        global.draw = _wrappedDraw;
+        this._myP5.draw = _wrappedDraw;
     }
 
     _bindGlobals() {
@@ -260,8 +323,8 @@ class P5b extends P5bBase {
             } else if (!key.startsWith("_")) {
                 // Bind non-private properties (like frameCount, width, height)
                 Object.defineProperty(global, key, {
-                    get: () => this._myP5[key],
-                    set: (val) => { try { this._myP5[key] = val; } catch (_) { /* readonly in p5 2.x */ } },
+                    get: () => this._myP5?.[key],
+                    set: (val) => { if (this._myP5) try { this._myP5[key] = val; } catch (_) { /* readonly in p5 2.x */ } },
                     configurable: true
                 });
             }
@@ -296,12 +359,13 @@ class P5b extends P5bBase {
         };
         
         global.loadFont = (function(that) {
-            // p5.js 2.x uses Typr (not opentype.js) internally for WEBGL glyph rendering.
-            // p5.Font.data and _positionGlyphs both expect a Typr-parsed font object.
-            // We read the file with fs, pass raw bytes to p5's own parseFontData (which
-            // uses Typr), then construct a proper p5.Font. We also register the font with
-            // node-canvas so 2D graphics (createGraphics + textFont) can render it.
-            return async function(fontPath) {
+            // p5.js 2.x loadFont is async (fetch + FontFace.load), but p5b's shell contract is
+            // synchronous: sketches assign font = loadFont(path) in preload/setup and use
+            // font.font immediately, and missing files must throw synchronously. opentype.js
+            // parses TTF/OTF synchronously and its font objects expose the same .names metadata
+            // p5 v1 exposes. The FontFace family matches the node-canvas registration so 2D
+            // canvas text rendering (createGraphics + textFont) can rasterize the glyphs.
+            return function(fontPath) {
                 const resolvedPath = global._resolveAssetPath(that.sketchPath, fontPath);
                 let fontData;
                 try {
@@ -312,19 +376,20 @@ class P5b extends P5bBase {
                     }
                     throw new Error(`Failed to load font: ${error.message}`);
                 }
-                const bytes = new Uint8Array(fontData);
-                // parseFontData accepts Uint8Array directly, skipping fetch, parses with Typr
-                const rawFont = await that._myP5.parseFontData(bytes);
-                const fontName = path.basename(fontPath, path.extname(fontPath));
-                const fontFace = new global.FontFace(fontName, bytes);
+                const parsedFont = opentype.parse(
+                    fontData.buffer.slice(fontData.byteOffset, fontData.byteOffset + fontData.byteLength)
+                );
+                const family = parsedFont.names?.fontFamily?.en
+                    || parsedFont.names?.fullName?.en
+                    || path.basename(fontPath, path.extname(fontPath));
+                const fontFace = new global.FontFace(family, fontData);
                 // Register with node-canvas so 2D canvas text rendering (createGraphics, pg.text) works
-                canvas.registerFont(resolvedPath, { family: fontName });
-                const p5Font = new (that._loadP5()).Font(that._myP5, fontFace, fontName, fontPath, rawFont);
-                // hasGlyphData() checks textFont.font.data — font.font must be the Typr-parsed font
-                // and Typr fonts expose their data via the object itself (not .data property),
-                // so we set .data to a truthy sentinel to satisfy the check.
-                p5Font.font = rawFont;
-                p5Font.font.data = bytes;
+                canvas.registerFont(resolvedPath, { family });
+                const p5Font = new (that._loadP5()).Font(that._myP5, fontFace, family, fontPath, parsedFont);
+                // hasGlyphData() checks textFont.font.data — set .data to the raw bytes so
+                // textToPoints()/WEBGL glyph helpers treat the font as having glyph data.
+                p5Font.font = parsedFont;
+                p5Font.font.data = fontData;
                 return p5Font;
             };
         })(this);
@@ -341,7 +406,7 @@ class P5b extends P5bBase {
                     throw new Error("P5 instance is broken, did you call p5b.stop()?");
                 }
 
-                p5._incrementPreload();
+                that._preloadIncrement();
 
                 const resolvedPath = global._resolveAssetPath(that.sketchPath, filePath);
                 const url = filePath.startsWith("http") ? filePath : `file://${resolvedPath}`;
@@ -355,14 +420,14 @@ class P5b extends P5bBase {
                         // Ignoring for now, only needed for webGL to refresh textures
                         // pImg.modified = true;
                         if (onSuccess) onSuccess(pImg);
-                        setImmediate(() => p5._decrementPreload());
+                        setImmediate(() => that._preloadDecrement());
                     };
                     rawImg.onerror = (err) => handleError(err instanceof Error ? err : new Error(String(err)));
                     rawImg.src = Buffer.from(imageData);
                 };
 
                 const handleError = (error) => {
-                    setImmediate(() => p5._decrementPreload());
+                    setImmediate(() => that._preloadDecrement());
                     if (onError) onError(error);
                     else console.error(`Failed to load image: ${error.message}`);
                 };
@@ -403,12 +468,8 @@ class P5b extends P5bBase {
                 }
                 
                 const ret = cg(w, h, ...rest);
-                // Override .remove() on new graphics before they're used
-                ret.remove = function() {
-                    if (this.elt && this.elt.parentNode) {
-                        this.elt.parentNode.removeChild(this.elt);
-                    }
-                };
+                // Override .remove() on new graphics so they return to the pool
+                that._trackNewGraphics(ret, key);
                 return ret;
             };
         })(this, global.createGraphics);
@@ -566,6 +627,12 @@ class P5b extends P5bBase {
         global.saveTable = noop;
         global.saveImage = noop;
         global.print = (msg) => console.log(msg);
+
+        // p5 v2 removed the v1 string helper globals; shim v1 semantics so
+        // existing sketches using join()/split()/trim() keep working.
+        global.join = (list, separator) => list.join(separator);
+        global.split = (str, delim) => str.split(delim);
+        global.trim = (str) => (str instanceof Array ? str.map((s) => s.trim()) : str.trim());
         
         // Mouse/keyboard event handlers - noop in headless environment
         global.mousePressed = noop;
@@ -625,8 +692,7 @@ class P5b extends P5bBase {
 
         global.loadStrings = (function(that) {
             return function(filePath, callback, errorCallback) {
-                const p5 = that._myP5;
-                p5._incrementPreload();
+                that._preloadIncrement();
                 try {
                     const resolvedPath = global._resolveAssetPath(that.sketchPath, filePath);
                     const content = fs.readFileSync(resolvedPath, "utf8");
@@ -636,10 +702,10 @@ class P5b extends P5bBase {
                         .split(/\r/);
                     if (lines.length > 0 && lines[lines.length - 1] === "") lines.pop();
                     if (callback) callback(lines);
-                    setImmediate(() => p5._decrementPreload());
+                    setImmediate(() => that._preloadDecrement());
                     return lines;
                 } catch (error) {
-                    setImmediate(() => p5._decrementPreload());
+                    setImmediate(() => that._preloadDecrement());
                     if (errorCallback) errorCallback(error);
                     else console.error(`Failed to load strings: ${error.message}`);
                 }
@@ -648,8 +714,7 @@ class P5b extends P5bBase {
 
         global.loadTable = (function(that) {
             return function(filePath, ...args) {
-                const p5 = that._myP5;
-                p5._incrementPreload();
+                that._preloadIncrement();
 
                 // Parse variadic args: loadTable(path, [options], [header], callback, errorCallback)
                 let options = "";
@@ -679,31 +744,61 @@ class P5b extends P5bBase {
                         .split(/\r/)
                         .filter(l => l.length > 0);
 
+                    // Mirror p5 v2's native loadTable: set columns directly and build rows
+                    // via new TableRow(cells). Table.addRow() with no arguments would hit
+                    // `new p5.TableRow()` inside the v2 bundle, which throws a
+                    // ReferenceError ("p5 is not defined") in the headless build.
                     const P5 = that._loadP5();
+                    
+                    // p5 v2 TableRow.get/getNum/getString look up string columns via
+                    // this.obj[this.table.columns.indexOf(column)] — broken because obj is
+                    // keyed by numeric position, so name lookups read the wrong slot (e.g.
+                    // returning stale data after set()). Patch the prototype once to read
+                    // this.obj[column] instead, matching p5 v1 semantics.
+                    if (!that._tableRowPatched) {
+                        that._tableRowPatched = true;
+                        const proto = P5.TableRow.prototype;
+                        proto.get = function (column) {
+                            return typeof column === "string" ? this.obj[column] : this.arr[column];
+                        };
+                        proto.getString = function (column) {
+                            return (typeof column === "string" ? this.obj[column] : this.arr[column]).toString();
+                        };
+                        proto.getNum = function (column) {
+                            const value = typeof column === "string" ? this.obj[column] : this.arr[column];
+                            const ret = parseFloat(value);
+                            if (ret.toString() === "NaN") {
+                                throw `Error: ${value} is NaN (Not a Number)`;
+                            }
+                            return ret;
+                        };
+                    }
                     const table = new P5.Table();
 
                     let startRow = 0;
                     if (hasHeader && lines.length > 0) {
-                        const headers = lines[0].split(separator);
-                        headers.forEach(h => table.addColumn(h.trim()));
+                        table.columns = lines[0].split(separator).map(h => h.trim());
                         startRow = 1;
                     }
 
                     for (let i = startRow; i < lines.length; i++) {
-                        const cells = lines[i].split(separator);
+                        const cells = lines[i].split(separator).map(c => c.trim());
                         // Auto-add columns on first data row when no header was provided
                         if (table.columns.length === 0) {
-                            cells.forEach((_, j) => table.addColumn(String(j)));
+                            table.columns = cells.map((_, j) => String(j));
                         }
-                        const row = table.addRow();
-                        cells.forEach((cell, j) => row.set(j, cell.trim()));
+                        const row = new P5.TableRow(cells);
+                        // Seed name-keyed entries so string column lookups work; v2's
+                        // TableRow constructor only keys obj by numeric position.
+                        table.columns.forEach((name, j) => { row.obj[name] = cells[j]; });
+                        table.addRow(row);
                     }
 
                     if (callback) callback(table);
-                    setImmediate(() => p5._decrementPreload());
+                    setImmediate(() => that._preloadDecrement());
                     return table;
                 } catch (error) {
-                    setImmediate(() => p5._decrementPreload());
+                    setImmediate(() => that._preloadDecrement());
                     if (errorCallback) errorCallback(error);
                     else console.error(`Failed to load table: ${error.message}`);
                 }

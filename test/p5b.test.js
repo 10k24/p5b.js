@@ -162,7 +162,7 @@ describe("P5b Instance Management", () => {
 });
 
 describe("P5b Error Handling", () => {
-    it("should track error count in metrics", (done) => {
+    it("should track error count in metrics", async () => {
         const p5b = new P5b({
             width: 32, height: 32,
             fps: 30,
@@ -170,18 +170,15 @@ describe("P5b Error Handling", () => {
             draw: () => { throw new Error("Test draw error"); }
         });
 
-        let errorCount = 0;
-        p5b.on("error", (evt) => {
-            errorCount++;
-            if (errorCount === 1) {
-                const metrics = p5b.getMetrics();
-                expect(metrics.errors).toBeGreaterThan(0);
-                p5b.stop();
-                done();
-            }
+        await new Promise((resolve) => {
+            p5b.on("error", resolve);
+            p5b.run();
         });
 
-        p5b.run();
+        const metrics = p5b.getMetrics();
+        p5b.stop();
+
+        expect(metrics.errors).toBe(1);
     });
 
     it("should emit error event when preload throws", (done) => {

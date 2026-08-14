@@ -14,6 +14,20 @@ const P5B_DEFAULTS = {
     draw: noop
 };
 
+// TODO: define common globals in this file
+
+// Swap pixel data order BGRA -> RGBA. Shared by both adapters' toFrame() scale path
+// (node-canvas toBuffer("raw") emits BGRA). Single source of truth for the adapters.
+const reorderBuffer = (buf) => {
+    const ret = new Uint8Array(buf);
+    for (let i = 0; i < ret.length; i += 4) {
+        const b = ret[i];
+        ret[i] = ret[i + 2];
+        ret[i + 2] = b;
+    }
+    return ret;
+};
+
 class P5bBase extends EventEmitter {
     constructor(config = {}) {
         super();
@@ -29,7 +43,7 @@ class P5bBase extends EventEmitter {
             errors: 0
         };
         this._validateConfig();
-        this._dom = new P5bDOM(this.width, this.height);
+        this._dom = new P5bDOM(this.width, this.height, { p5Major: this.p5Major });
     }
 
     getMetrics() {
@@ -66,4 +80,4 @@ class P5bBase extends EventEmitter {
     }
 }
 
-module.exports = { P5bBase, P5B_DEFAULTS };
+module.exports = { P5bBase, P5B_DEFAULTS, reorderBuffer };

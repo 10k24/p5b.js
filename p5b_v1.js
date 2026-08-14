@@ -3,20 +3,20 @@ const fs = require("fs");
 const path = require("path");
 const vm = require("vm");
 const opentype = require("opentype.js");
-const { P5bBase, P5B_DEFAULTS } = require("./p5b-base");
+const { P5bBase, P5B_DEFAULTS, reorderBuffer } = require("./p5b-base");
 
 const noop = () => {};
 
-// Swap pixel data order BGRA -> RGBA
-const reorderBuffer = (buf) => {
-    const ret = new Uint8Array(buf);
-    for (let i = 0; i < ret.length; i += 4) {
-        const b = ret[i];
-        ret[i] = ret[i + 2];
-        ret[i + 2] = b;
-    }
-    return ret;
-};
+// // Swap pixel data order BGRA -> RGBA
+// const reorderBuffer = (buf) => {
+//     const ret = new Uint8Array(buf);
+//     for (let i = 0; i < ret.length; i += 4) {
+//         const b = ret[i];
+//         ret[i] = ret[i + 2];
+//         ret[i + 2] = b;
+//     }
+//     return ret;
+// };
 
 class P5b extends P5bBase {
     constructor(config = {}) {
@@ -90,9 +90,6 @@ class P5b extends P5bBase {
 
         const ctx = this._destCanvas.getContext("2d");
 
-        // Ensure a blank canvas on all pixels when not stretching source frame
-        ctx.clearRect(0, 0, this.width, this.height);
-
         // Fit to destination, do not stretch
         const xRatio = this.width / srcCanvas.width;
         const yRatio = this.height / srcCanvas.height;
@@ -107,23 +104,24 @@ class P5b extends P5bBase {
         return reorderBuffer(this._destCanvas.toBuffer("raw"));
     }
 
-    getMetrics() {
-        return this._metrics;
-    }
-
     _loadP5() {
         global.performance = {
             now: () => Date.now()
         };
-        return require("p5").default || require("p5");
+        const p5pkg = process.env.P5B_P5_PATH || "p5";
+        return require(p5pkg).default || require(p5pkg);
     }
 
     _initSketch() {
         this._myP5.frameRate(this.fps);
 
+        // p5 v1 in Node.js calls global.preload() directly (window===global) AND this._myP5.preload().
+        // Null out global.preload after capturing it so p5's direct call is a noop; wrapper owns the call.
+        const _userPreload = global.preload;
+        global.preload = noop;
         this._myP5.preload = () => {
             try {
-                global.preload();
+                _userPreload();
             } catch (error) {
                 this._emitRuntimeError(error, "preload");
                 this.stop();
@@ -145,7 +143,12 @@ class P5b extends P5bBase {
             finally { this._redrawing = false; }
         };
 
-        this._myP5.draw = () => {
+        // p5 v1 calls global.draw() directly from its animation loop (not this._myP5.draw),
+        // so the try-catch wrapper must live in global.draw, not just this._myP5.draw.
+        // Capture after _bindGlobals() runs (sketch may have overwritten global.draw via vm).
+        const _userDraw = global.draw;
+        const _wrappedDraw = () => {
+            if (!this._myP5) return;
             try {
                 // Block animation loop calls when stopped, but always allow redraw() through
                 if (!this._redrawing && this._metrics.framesDrawn > 0 && !this._myP5.isLooping()) {
@@ -153,7 +156,7 @@ class P5b extends P5bBase {
                 }
 
                 const elemsBefore = this._myP5._elements.length;
-                global.draw();
+                _userDraw.call(this._myP5);
 
                 // Return pool-checked-out graphics objects back to the pool
                 for (const { pg, key } of this._gfxActive) {
@@ -182,6 +185,8 @@ class P5b extends P5bBase {
                 this.stop();
             }
         };
+        global.draw = _wrappedDraw;
+        this._myP5.draw = _wrappedDraw;
     }
 
     _bindGlobals() {
@@ -194,8 +199,8 @@ class P5b extends P5bBase {
             } else if (!key.startsWith("_")) {
                 // Bind non-private properties (like frameCount, width, height)
                 Object.defineProperty(global, key, {
-                    get: () => this._myP5[key],
-                    set: (val) => { this._myP5[key] = val; },
+                    get: () => this._myP5?.[key],
+                    set: (val) => { if (this._myP5) this._myP5[key] = val; },
                     configurable: true
                 });
             }
@@ -264,7 +269,10 @@ class P5b extends P5bBase {
         // in preload and img.width/height are usable in setup/draw after the
         // preload counter clears). The shell is backed by a node-canvas Canvas,
         // so p5.js's image() function can draw it via img.canvas/.drawingContext.
-        global.loadImage = (function(that) {
+        // p5 v1 rebinds preload methods (loadImage, loadJSON, etc.) to global just before
+        // calling this.preload(), overwriting our custom implementations. Use defineProperty
+        // with a no-op setter so those rebind assignments are silently ignored.
+        const _p5bLoadImage = (function(that) {
             return function(filePath, onSuccess, onError) {
                 const p5 = that._myP5;
                 if (!p5) {
@@ -317,6 +325,7 @@ class P5b extends P5bBase {
                 return pImg;
             };
         })(this);
+        global.loadImage = _p5bLoadImage;
 
         // Pool-based createGraphics: reuse Graphics objects across frames instead of
         // allocating new Cairo surfaces every draw call. On first use a new object is
@@ -345,18 +354,18 @@ class P5b extends P5bBase {
 
         global.loadJSON = (function(that) {
             return async function(filePath) {
+                const p5 = that._myP5;
+                p5._incrementPreload();
                 try {
                     const resolvedPath = global._resolveAssetPath(that.sketchPath, filePath);
-                    // Support both URLs and local file paths
                     const url = filePath.startsWith("http") ? filePath : `file://${resolvedPath}`;
                     const response = await global.fetch(url);
                     if (!response.ok) {
                         throw new Error(`Failed to load JSON: ${response.status} ${response.statusText}`);
                     }
                     return await response.json();
-                } catch (error) {
-                    console.error(`Error loading JSON from ${filePath}:`, error.message);
-                    throw error;
+                } finally {
+                    setImmediate(() => p5._decrementPreload());
                 }
             };
         })(this);

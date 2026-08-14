@@ -7,12 +7,101 @@ const spliceFrom = (arr, item) => {
     idx > -1 && arr.splice(idx, 1);
 };
 
+// Node-canvas compatibility patches, installed only for p5 v2 (options.p5Major === 2).
+// p5 v1 never needs them (and must not get them: percentage-color normalization would
+// add CSS Color 4 support v1 does not have).
+
+// p5 v2 renders custom shapes (beginShape/vertex/endShape) and clip() via Path2D,
+// a browser-only API node-canvas does not provide. Polyfill Path2D as a command
+// recorder and teach the node-canvas context to replay it through primitive path
+// commands before filling, stroking, or clipping.
+class P5bPath2D {
+    constructor() { this.cmds = []; }
+    moveTo(x, y) { this.cmds.push(["moveTo", x, y]); }
+    lineTo(x, y) { this.cmds.push(["lineTo", x, y]); }
+    bezierCurveTo(x1, y1, x2, y2, x3, y3) { this.cmds.push(["bezierCurveTo", x1, y1, x2, y2, x3, y3]); }
+    quadraticCurveTo(x1, y1, x2, y2) { this.cmds.push(["quadraticCurveTo", x1, y1, x2, y2]); }
+    arc(...args) { this.cmds.push(["arc", ...args]); }
+    ellipse(...args) { this.cmds.push(["ellipse", ...args]); }
+    rect(...args) { this.cmds.push(["rect", ...args]); }
+    closePath() { this.cmds.push(["closePath"]); }
+    addPath(other) { this.cmds.push(...other.cmds); }
+}
+
+// p5 v2 serializes HSB colors as CSS Color 4 percentage rgb(), e.g. rgb(100% 0% 0%).
+// Browsers parse that syntax natively, but node-canvas's color parser rejects percentages
+// and silently falls back to the default transparent-black fill/stroke. Normalize the
+// percentage form to the equivalent numeric rgb()/rgba() before it reaches node-canvas,
+// mirroring what p5 v2 expects the canvas layer to accept. Only this exact form is
+// rewritten; hex, hsl, hwb, lab, lch, oklab, oklch, and gradient/pattern objects pass
+// through untouched.
+const normalizeCssColor = (str) => {
+    if (typeof str !== "string") return str;
+    const m = /^rgba?\(\s*([-\d.]+)%\s+([-\d.]+)%\s+([-\d.]+)%\s*(?:\/\s*([-\d.]+))?\s*\)$/.exec(str);
+    if (!m) return str;
+    const r = Math.round(parseFloat(m[1]) * 2.55);
+    const g = Math.round(parseFloat(m[2]) * 2.55);
+    const b = Math.round(parseFloat(m[3]) * 2.55);
+    return m[4] !== undefined ? `rgba(${r}, ${g}, ${b}, ${parseFloat(m[4])})` : `rgb(${r}, ${g}, ${b})`;
+};
+
+let p5bColorCompatInstalled = false;
+function installColorCompat() {
+    if (p5bColorCompatInstalled) return;
+    p5bColorCompatInstalled = true;
+    const proto = canvas.CanvasRenderingContext2D.prototype;
+    for (const prop of ["fillStyle", "strokeStyle"]) {
+        const desc = Object.getOwnPropertyDescriptor(proto, prop);
+        if (!desc || !desc.set) continue;
+        Object.defineProperty(proto, prop, {
+            get: desc.get,
+            set: function (value) {
+                desc.set.call(this, normalizeCssColor(value));
+            },
+            configurable: true
+        });
+    }
+}
+
+let p5bPath2DInstalled = false;
+function installPath2D() {
+    if (p5bPath2DInstalled || typeof global.Path2D !== "undefined") return;
+    p5bPath2DInstalled = true;
+    global.Path2D = P5bPath2D;
+    const proto = canvas.CanvasRenderingContext2D.prototype;
+    const replay = (ctx, p) => {
+        ctx.beginPath();
+        for (const [cmd, ...args] of p.cmds) ctx[cmd](...args);
+    };
+    const origFill = proto.fill;
+    const origStroke = proto.stroke;
+    const origClip = proto.clip;
+    proto.fill = function (path) {
+        if (path && path.cmds) { replay(this, path); return origFill.call(this); }
+        return origFill.call(this, path);
+    };
+    proto.stroke = function (path) {
+        if (path && path.cmds) { replay(this, path); return origStroke.call(this); }
+        return origStroke.call(this, path);
+    };
+    proto.clip = function (path) {
+        if (path && path.cmds) { replay(this, path); return origClip.call(this); }
+        return origClip.call(this, path);
+    };
+}
+
 class P5bDOM {
-    constructor(width, height) {
+    constructor(width, height, options = {}) {
         this.width = width;
         this.height = height;
         this._bodyChildren = [];
         this._canvases = [];
+        
+        if (options.p5Major === 2) {
+            installPath2D();
+            installColorCompat();
+        }
+
         this._init();
     }
 
