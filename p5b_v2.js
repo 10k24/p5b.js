@@ -1,11 +1,8 @@
 const canvas = require("canvas");
 const fs = require("fs");
 const path = require("path");
-const vm = require("vm");
 const opentype = require("opentype.js");
 const { P5bBase, P5B_DEFAULTS, reorderBuffer } = require("./p5b-base");
-
-const noop = () => {};
 
 // TODO: need async/await support in v2 API
 
@@ -14,6 +11,24 @@ class P5b extends P5bBase {
         super({ ...config, p5Major: 2 });
         this._pendingLoads = 0;
     }
+
+    // toFrameNew() {
+    //     const isP3D = Boolean(this._myP5._renderer?.isP3D);
+    //     if (isP3D) {
+    //         this._myP5.loadPixels();
+    //         srcDrawable = canvas.createCanvas(srcCanvas.width, srcCanvas.height);
+    //         srcDrawable.getContext("2d").putImageData(
+    //             new canvas.ImageData(new Uint8ClampedArray(this._myP5.pixels.buffer), srcCanvas.width, srcCanvas.height),
+    //             0, 0
+    //         );
+
+    //         // TODO: maybe need some util functions for resize here
+
+    //         return new Uint8Array(ctx.getImageData(0, 0, this.width, this.height).data.buffer);
+    //     } else {
+    //         return super.toFrame(); // TODO: needs to be added to p5b-base    
+    //     }
+    // }
 
     toFrame() {
         const srcCanvas = this._myP5?.canvas;
@@ -88,31 +103,12 @@ class P5b extends P5bBase {
     _initSketch() {
         this._myP5.frameRate(this.fps);
 
-        // p5.js 2.x removed preload() — do not assign it on the p5 instance or
-        // the FES will throw before setup runs. If the user provided a preload
-        // function, invoke it synchronously before setup as a best-effort shim.
-        // Config preload wins; for sketchPath mode the sketch's own preload is
-        // written to global.preload by vm.runInThisContext() in _bindGlobals().
-        // Compare against P5B_DEFAULTS.preload (not this module's noop) so the
-        // default no-op preload isn't mistaken for a user-provided one.
-        const _userPreload = (typeof this.preload === "function" && this.preload !== P5B_DEFAULTS.preload)
-            ? this.preload
-            // Only sketchPath mode writes the sketch's preload to global.preload (via vm).
-            // Gating on sketchPath prevents a stale preload from a prior sketchPath instance
-            // leaking into inline-config instances when test files share one process.
-            : (this.sketchPath && typeof global.preload === "function" ? global.preload : this.preload);
-        const hasUserPreload = typeof _userPreload === "function" && _userPreload !== P5B_DEFAULTS.preload;
-
+        // p5.js 2.x removed preload() — _validateConfig() rejects any preload config
+        // and _bindGlobals() never assigns it on the p5 instance (the FES would throw
+        // before setup runs). Preload is a v1-only lifecycle hook.
         this._myP5.setup = async () => {
-            if (hasUserPreload) {
-                try { _userPreload(); } catch (error) {
-                    this._emitRuntimeError(error, "preload");
-                    this.stop();
-                    return;
-                }
-            }
             try {
-                // Wait for pending preload loads (loadImage/loadStrings/loadTable) to settle
+                // Wait for pending loads (loadImage/loadStrings/loadTable) to settle
                 // before running setup, preserving the v1-style sync-shell contract.
                 await this._waitForPreloads();
                 // Await in case sketch setup is async (e.g. uses await loadFont())
@@ -187,55 +183,11 @@ class P5b extends P5bBase {
         this._myP5.draw = _wrappedDraw;
     }
 
-    _propertySetter(key, val) { if (this._myP5) try { this._myP5[key] = val; } catch (_) { /* readonly in p5 2.x */ } };
+    _propertySetter(key, val) { if (this._myP5) try { this._myP5[key] = val; } catch (_) { /* readonly in p5 2.x */ } }
 
     _bindGlobals() {
         super._bindGlobals();
 
-        // Walk prototype chain to bind all functions and key properties
-        for (const key in this._myP5) {
-            const value = this._myP5[key];
-            if (typeof value === "function") {
-                global[key] = value.bind(this._myP5);
-
-            } else if (!key.startsWith("_")) {
-                // Bind non-private properties (like frameCount, width, height)
-                Object.defineProperty(global, key, {
-                    get: () => this._myP5?.[key],
-                    set: this._propertySetter(key, value),
-                    configurable: true
-                });
-            }
-        }
-
-        // Bind windowWidth/windowHeight explicitly - they may not exist on p5 instance
-        // until createCanvas() is called, but should still be accessible
-        // Use ?? 0 fallback to match p5.js behavior before createCanvas()
-        Object.defineProperty(global, "windowWidth", {
-            get: () => this._myP5?.windowWidth ?? 0,
-            configurable: true
-        });
-        Object.defineProperty(global, "windowHeight", {
-            get: () => this._myP5?.windowHeight ?? 0,
-            configurable: true
-        });
-
-        // Execute sketch if provided (overwrites globals)
-        if (this.sketchPath) {
-            const absoluteSketchPath = path.resolve(this.sketchPath);
-            const code = fs.readFileSync(absoluteSketchPath, "utf8");
-            vm.runInThisContext(code, { filename: absoluteSketchPath });
-        }
-
-        global._resolveAssetPath = function(sketchPath, filePath) {
-            const assetDir = sketchPath
-                ? path.dirname(path.resolve(sketchPath))
-                : process.cwd();
-            return path.isAbsolute(filePath)
-                ? filePath
-                : path.resolve(assetDir, filePath);
-        };
-        
         global.loadFont = (function(that) {
             // p5.js 2.x loadFont is async (fetch + FontFace.load), but p5b's shell contract is
             // synchronous: sketches assign font = loadFont(path) in preload/setup and use
@@ -380,191 +332,12 @@ class P5b extends P5bBase {
             };
         })(this);
 
-        // p5.js standalone math functions (pass-through to Math)
-        global.abs = Math.abs;
-        global.ceil = Math.ceil;
-        global.floor = Math.floor;
-        global.round = Math.round;
-        global.pow = Math.pow;
-        global.sqrt = Math.sqrt;
-        global.exp = Math.exp;
-        global.log = Math.log;
-        global.max = Math.max;
-        global.min = Math.min;
-        global.sin = Math.sin;
-        global.cos = Math.cos;
-        global.tan = Math.tan;
-        global.asin = Math.asin;
-        global.acos = Math.acos;
-        global.atan = Math.atan;
-        global.atan2 = Math.atan2;
-        global.PI = Math.PI;
-        global.TWO_PI = Math.PI * 2;
-        global.HALF_PI = Math.PI / 2;
-        global.QUARTER_PI = Math.PI / 4;
-        global.TAU = Math.PI * 2;
-
-        // p5.js constants
-        global.DEGREES = "degrees";
-        global.RADIANS = "radians";
-        global.P2D = "p2d";
-        global.WEBGL = "webgl";
-        global.WEBGL2 = "webgl2";
-        global.CORNER = "corner";
-        global.CORNERS = "corners";
-        global.RADIUS = "radius";
-        global.CENTER = "center";
-        global.LEFT = "left";
-        global.RIGHT = "right";
-        global.TOP = "top";
-        global.BOTTOM = "bottom";
-        global.BASELINE = "alphabetic";
-        global.CLOSE = "close";
-        global.OPEN = "open";
-        global.CHORD = "chord";
-        global.PIE = "pie";
-        global.ROUND = "round";
-        global.SQUARE = "butt";
-        global.PROJECT = "square";
-        global.BEVEL = "bevel";
-        global.MITER = "miter";
-        global.POINTS = 0x0000;
-        global.LINES = 0x0001;
-        global.LINE_STRIP = 0x0003;
-        global.LINE_LOOP = 0x0002;
-        global.TRIANGLES = 0x0004;
-        global.TRIANGLE_FAN = 0x0006;
-        global.TRIANGLE_STRIP = 0x0005;
-        global.QUADS = "quads";
-        global.QUAD_STRIP = "quad_strip";
-        global.TESS = "tess";
-        global.LINEAR = "linear";
-        global.QUADRATIC = "quadratic";
-        global.BEZIER = "bezier";
-        global.CURVE = "curve";
-        global.RGB = "rgb";
-        global.HSB = "hsb";
-        global.HSL = "hsl";
-        global.BLEND = "source-over";
-        global.REMOVE = "destination-out";
-        global.ADD = "lighter";
-        global.DARKEST = "darken";
-        global.LIGHTEST = "lighten";
-        global.DIFFERENCE = "difference";
-        global.SUBTRACT = "subtract";
-        global.EXCLUSION = "exclusion";
-        global.MULTIPLY = "multiply";
-        global.SCREEN = "screen";
-        global.REPLACE = "copy";
-        global.OVERLAY = "overlay";
-        global.HARD_LIGHT = "hard-light";
-        global.SOFT_LIGHT = "soft-light";
-        global.DODGE = "color-dodge";
-        global.BURN = "color-burn";
-        global.ARROW = "default";
-        global.CROSS = "crosshair";
-        global.HAND = "pointer";
-        global.MOVE = "move";
-        global.TEXT = "text";
-        global.WAIT = "wait";
-        global.ALT = 18;
-        global.CONTROL = 17;
-        global.SHIFT = 16;
-        global.OPTION = 18;
-        global.BACKSPACE = 8;
-        global.DELETE = 46;
-        global.TAB = 9;
-        global.ENTER = 13;
-        global.RETURN = 13;
-        global.ESCAPE = 27;
-        global.UP_ARROW = 38;
-        global.DOWN_ARROW = 40;
-        global.LEFT_ARROW = 37;
-        global.RIGHT_ARROW = 39;
-        global.NORMAL = "normal";
-        global.ITALIC = "italic";
-        global.BOLD = "bold";
-        global.BOLDITALIC = "bold italic";
-        global.CHAR = "CHAR";
-        global.WORD = "WORD";
-        global.AUTO = "auto";
-        global.STROKE = "stroke";
-        global.FILL = "fill";
-        global.TEXTURE = "texture";
-        global.IMMEDIATE = "immediate";
-        global.NEAREST = "nearest";
-        global.REPEAT = "repeat";
-        global.CLAMP = "clamp";
-        global.MIRROR = "mirror";
-        global.FLAT = "flat";
-        global.SMOOTH = "smooth";
-        global.LANDSCAPE = "landscape";
-        global.PORTRAIT = "portrait";
-
-        // Accessibility functions - noop in headless environment (no DOM/screen readers)
-        global.describe = noop;
-        global.describeElement = noop;
-        global.textOutput = noop;
-        global.gridOutput = noop;
-
-        // File I/O functions - noop in headless environment
-        global.saveCanvas = noop;
-        global.saveFrames = noop;
-        global.saveJSON = noop;
-        global.saveStrings = noop;
-        global.saveTable = noop;
-        global.saveImage = noop;
-        global.print = (msg) => console.log(msg);
-
+        // TODO: confirm if this assumption is valid, seems wrong
         // p5 v2 removed the v1 string helper globals; shim v1 semantics so
         // existing sketches using join()/split()/trim() keep working.
         global.join = (list, separator) => list.join(separator);
         global.split = (str, delim) => str.split(delim);
         global.trim = (str) => (str instanceof Array ? str.map((s) => s.trim()) : str.trim());
-        
-        // Mouse/keyboard event handlers - noop in headless environment
-        global.mousePressed = noop;
-        global.mouseReleased = noop;
-        global.mouseMoved = noop;
-        global.mouseDragged = noop;
-        global.mouseWheel = noop;
-        global.keyPressed = noop;
-        global.keyReleased = noop;
-        global.touchStarted = noop;
-        global.touchEnded = noop;
-        global.touchMoved = noop;
-        global.cursor = noop;
-        global.noCursor = noop;
-        
-        // Mouse/keyboard properties - all zero in headless
-        global.mouseX = 0;
-        global.mouseY = 0;
-        global.pmouseX = 0;
-        global.pmouseY = 0;
-        global.key = "";
-        global.keyCode = 0;
-        global.accelerationX = 0;
-        global.accelerationY = 0;
-        global.accelerationZ = 0;
-
-        // Audio functions - noop in headless environment (p5.sound)
-        global.loadSound = noop;
-        global.loadAudio = noop;
-        global.createAudio = noop;
-        global.getAudioContext = noop;
-        global.userStartAudio = noop;
-        global.soundFormats = noop;
-
-        global.windowResized = (function(that, wr) {
-            return function() {
-                that._dom.resize(that.width, that.height);
-                that._destCanvas = canvas.createCanvas(that.width, that.height);
-                if (typeof that.windowResized === "function") {
-                    that.windowResized();
-                }
-                if (typeof wr === "function") wr();
-            };
-        })(this, global.windowResized);
 
         global.createCanvas = (function(that, cc) {
             return function(w, h, renderer) {
@@ -692,6 +465,16 @@ class P5b extends P5bBase {
                 }
             };
         })(this);
+    }
+
+    _validateConfig() {
+        super._validateConfig();
+        if (this.preload) {
+            throw new Error("Invalid config: preload is not supported in p5.js v2 (p5 v2 removed preload()).");
+        }
+
+        // TODO: once full async/await support is added, consider adding async function validation; e.g.
+        // theFunction.constructor.name === 'AsyncFunction'
     }
 
     // --- v2-only helpers (not present in p5b_v1.js; tracked preload lifecycle) ---

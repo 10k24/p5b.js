@@ -3,6 +3,8 @@ const { describe, it, expect } = require("bun:test");
 const path = require("path");
 const { P5b } = require("../../p5b");
 
+const isP5v2 = (process.env.P5B_P5_PATH || "p5") !== "p5";
+
 const sketchesDir = path.join(process.cwd(), "test/fixtures/sketches");
 
 describe("P5b Real Sketch - Shapes", () => {
@@ -142,7 +144,9 @@ describe("P5b Real Sketch - Shapes (colored)", () => {
 });
 
 describe("P5b Real Sketch - loadImage", () => {
-    it("should render image with correct pixel colors at 32x32", (done) => {
+    // The loadimage.js fixture is v1-style (uses function preload()); v2 rejects preload,
+    // so this sketchPath test only runs against p5 v1.
+    it.skipIf(isP5v2)("should render image with correct pixel colors at 32x32", (done) => {
         const p5b = new P5b({
             sketchPath: path.join(sketchesDir, "loadimage.js"),
             width: 32,

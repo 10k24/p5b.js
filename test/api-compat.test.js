@@ -3,8 +3,10 @@ const { P5b } = require("../p5b.js");
 const fs = require("fs");
 const path = require("path");
 
+const isP5v2 = (process.env.P5B_P5_PATH || "p5") !== "p5";
+
 describe("API Compatibility: loadJSON", () => {
-    it("should load local JSON file", async (done) => {
+    it.skipIf(isP5v2)("should load local JSON file", async (done) => {
         const testJsonPath = path.join(process.cwd(), "test-data.json");
         fs.writeFileSync(testJsonPath, JSON.stringify({ foo: "bar", value: 123 }));
         let loaded = null;
@@ -26,7 +28,7 @@ describe("API Compatibility: loadJSON", () => {
         p5b.run();
     });
 
-    it("should throw on missing file", async (done) => {
+    it.skipIf(isP5v2)("should throw on missing file", async (done) => {
         let error = null;
         const p5b = new P5b({
             preload: async function() {
@@ -100,7 +102,7 @@ describe("API Compatibility: Mouse/Keyboard Properties", () => {
 });
 
 describe("API Compatibility: loadImage", () => {
-    it("should load a local image file", (done) => {
+    it.skipIf(isP5v2)("should load a local image file", (done) => {
         const testImagePath = path.join(process.cwd(), "test/fixtures/img", "natalie-kinnear-CC2Bfvk2-tU-unsplash.jpg");
         let loadedImg = null;
         const p5b = new P5b({
@@ -120,7 +122,7 @@ describe("API Compatibility: loadImage", () => {
         p5b.run();
     });
 
-    it("should load a local PNG file with correct pixel data", (done) => {
+    it.skipIf(isP5v2)("should load a local PNG file with correct pixel data", (done) => {
         const testImagePath = path.join(process.cwd(), "test/fixtures/img", "test-red-pixel.png");
         let loadedImg = null;
         const p5b = new P5b({
@@ -146,7 +148,7 @@ describe("API Compatibility: loadImage", () => {
         p5b.run();
     });
 
-    it("should call failureCallback on missing image file", (done) => {
+    it.skipIf(isP5v2)("should call failureCallback on missing image file", (done) => {
         let error = null;
         const p5b = new P5b({
             preload: function() {

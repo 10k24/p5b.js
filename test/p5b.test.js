@@ -2,6 +2,8 @@ const { describe, it, expect } = require("bun:test");
 const path = require("path");
 const { P5b, P5B_DEFAULTS } = require("../p5b.js");
 
+const isP5v2 = (process.env.P5B_P5_PATH || "p5") !== "p5";
+
 describe("P5b Exports", () => {
     it("should export P5b class", () => {
         expect(P5b).toBeDefined();
@@ -36,7 +38,6 @@ describe("P5B_DEFAULTS shape", () => {
         expect(P5B_DEFAULTS).toHaveProperty("width");
         expect(P5B_DEFAULTS).toHaveProperty("height");
         expect(P5B_DEFAULTS).toHaveProperty("fps");
-        expect(P5B_DEFAULTS).toHaveProperty("preload");
         expect(P5B_DEFAULTS).toHaveProperty("setup");
         expect(P5B_DEFAULTS).toHaveProperty("draw");
     });
@@ -46,7 +47,6 @@ describe("P5B_DEFAULTS shape", () => {
         expect(P5B_DEFAULTS.width).toBe(32);
         expect(P5B_DEFAULTS.height).toBe(32);
         expect(P5B_DEFAULTS.fps).toBe(60);
-        expect(typeof P5B_DEFAULTS.preload).toBe("function");
         expect(typeof P5B_DEFAULTS.setup).toBe("function");
         expect(typeof P5B_DEFAULTS.draw).toBe("function");
     });
@@ -72,8 +72,12 @@ describe("P5b Configuration Validation", () => {
         expect(() => new P5b({ height: 3.14 })).toThrow("height must be a positive integer");
     });
 
-    it("should reject non-function preload", () => {
+    it.skipIf(isP5v2)("should reject non-function preload", () => {
         expect(() => new P5b({ preload: "not a function" })).toThrow("preload must be a function");
+    });
+
+    it.skipIf(!isP5v2)("should reject any preload config", () => {
+        expect(() => new P5b({ preload: () => {} })).toThrow("preload is not supported in p5.js v2");
     });
 
     it("should reject non-function setup", () => {
@@ -181,7 +185,7 @@ describe("P5b Error Handling", () => {
         expect(metrics.errors).toBe(1);
     });
 
-    it("should emit error event when preload throws", (done) => {
+    it.skipIf(isP5v2)("should emit error event when preload throws", (done) => {
         const p5b = new P5b({
             width: 32, height: 32,
             fps: 30,

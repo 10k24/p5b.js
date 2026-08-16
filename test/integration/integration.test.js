@@ -486,7 +486,7 @@ describe("P5b Integration - Buffer Analysis", () => {
         p5b.run();
     });
 
-    it("should execute preload function", (done) => {
+    it.skipIf(isP5v2)("should execute preload function", (done) => {
         let preloadCalled = false;
         const p5b = new P5b({
             width: 32,
@@ -777,7 +777,7 @@ describe("P5b Integration - Graphics Pooling", () => {
 });
 
 describe("P5b Integration - loadImage", () => {
-    it("should load image in preload and render in draw", (done) => {
+    it.skipIf(isP5v2)("should load image in preload and render in draw", (done) => {
         const testImagePath = path.join(process.cwd(), "test/fixtures/img/natalie-kinnear-CC2Bfvk2-tU-unsplash.jpg");
         let loadedImg = null;
 
@@ -813,7 +813,7 @@ describe("P5b Integration - loadImage", () => {
         p5b.run();
     });
 
-    it("should handle loadImage error gracefully", (done) => {
+    it.skipIf(isP5v2)("should handle loadImage error gracefully", (done) => {
         let error = null;
 
         const p5b = new P5b({
@@ -841,7 +841,7 @@ describe("P5b Integration - loadImage", () => {
         p5b.run();
     });
 
-    it("should scale image when drawing with different dimensions", (done) => {
+    it.skipIf(isP5v2)("should scale image when drawing with different dimensions", (done) => {
         const testImagePath = path.join(process.cwd(), "test/fixtures/img/natalie-kinnear-CC2Bfvk2-tU-unsplash.jpg");
         let loadedImg = null;
 
@@ -2059,7 +2059,7 @@ describe("P5b Integration - Typography", () => {
 });
 
 describe("P5b Integration - Data/IO", () => {
-    it("loadStrings() in preload returns array of lines", (done) => {
+    it.skipIf(isP5v2)("loadStrings() in preload returns array of lines", (done) => {
         const txtPath = path.resolve(process.cwd(), "test/fixtures/data/test.txt");
         let lines;
 
@@ -2085,7 +2085,7 @@ describe("P5b Integration - Data/IO", () => {
         p5b.run();
     });
 
-    it("loadStrings() calls callback with lines array", (done) => {
+    it.skipIf(isP5v2)("loadStrings() calls callback with lines array", (done) => {
         const txtPath = path.resolve(process.cwd(), "test/fixtures/data/test.txt");
         let callbackLines;
 
@@ -2137,16 +2137,17 @@ describe("P5b Integration - Data/IO", () => {
         p5b.run();
     });
 
-    it.skipIf(!isP5v2)("v2: loadTable() in preload parses CSV with header row", (done) => {
+    it.skipIf(!isP5v2)("v2: loadTable() parses CSV with header row", (done) => {
         const csvPath = path.resolve(process.cwd(), "test/fixtures/data/test.csv");
         let table;
 
         const p5b = new P5b({
             width: 16, height: 16, fps: 30,
-            preload: () => {
+            setup: () => {
+                createCanvas(16, 16);
+                // preload is v1-only (rejected in v2); v2 loadTable() is synchronous
                 table = loadTable(csvPath, "csv", "header");
             },
-            setup: () => { createCanvas(16, 16); },
             draw: () => { noLoop(); }
         });
 
@@ -2195,10 +2196,11 @@ describe("P5b Integration - Data/IO", () => {
 
         const p5b = new P5b({
             width: 16, height: 16, fps: 30,
-            preload: () => {
+            setup: () => {
+                createCanvas(16, 16);
+                // preload is v1-only (rejected in v2); v2 loadTable() is synchronous
                 table = loadTable(csvPath, "csv");
             },
-            setup: () => { createCanvas(16, 16); },
             draw: () => { noLoop(); }
         });
 
@@ -2218,10 +2220,11 @@ describe("P5b Integration - Data/IO", () => {
 
         const p5b = new P5b({
             width: 16, height: 16, fps: 30,
-            preload: () => {
+            setup: () => {
+                createCanvas(16, 16);
+                // preload is v1-only (rejected in v2); v2 loadTable() is synchronous
                 table = loadTable(csvPath, "csv", "header");
             },
-            setup: () => { createCanvas(16, 16); },
             draw: () => { noLoop(); }
         });
 
@@ -2420,7 +2423,7 @@ describe("P5b Integration - Accessibility", () => {
 describe("P5b Integration - loadFont", () => {
     const fontPath = path.resolve(process.cwd(), "test/fixtures/font/SourceCodePro-Regular.ttf");
 
-    it("loadFont() in preload returns a p5.Font object", (done) => {
+    it.skipIf(isP5v2)("loadFont() in preload returns a p5.Font object", (done) => {
         let font;
         const p5b = new P5b({
             width: 100, height: 100, fps: 30,
@@ -2439,7 +2442,7 @@ describe("P5b Integration - loadFont", () => {
         p5b.run();
     });
 
-    it("loadFont() allows textFont() to change rendering", (done) => {
+    it.skipIf(isP5v2)("loadFont() allows textFont() to change rendering", (done) => {
         let font;
         const p5b = new P5b({
             width: 100, height: 100, fps: 30,
@@ -2461,7 +2464,7 @@ describe("P5b Integration - loadFont", () => {
         p5b.run();
     });
 
-    it("loadFont() throws on missing file", (done) => {
+    it.skipIf(isP5v2)("loadFont() throws on missing file", (done) => {
         const p5b = new P5b({
             width: 16, height: 16, fps: 30,
             preload: () => { loadFont("does-not-exist.ttf"); },
