@@ -7,66 +7,9 @@ const { P5bBase, P5B_DEFAULTS, reorderBuffer } = require("./p5b-base");
 
 const noop = () => {};
 
-// // Swap pixel data order BGRA -> RGBA
-// const reorderBuffer = (buf) => {
-//     const ret = new Uint8Array(buf);
-//     for (let i = 0; i < ret.length; i += 4) {
-//         const b = ret[i];
-//         ret[i] = ret[i + 2];
-//         ret[i + 2] = b;
-//     }
-//     return ret;
-// };
-
 class P5b extends P5bBase {
     constructor(config = {}) {
-        super(config);
-    }
-
-    run() {
-        if (this._removed) {
-            throw new Error("P5b instance has been removed. Create a new instance to run again.");
-        }
-
-        // Resume after stop()
-        if (this._myP5) {
-            this._myP5.loop();
-            this._myP5.redraw();
-            return;
-        }
-
-        // First run
-        const sketch = (pInstance) => {
-            this._myP5 = pInstance;
-            this._bindGlobals();
-            this._initSketch();
-        };
-
-        try {
-            new (this._loadP5())(sketch);
-        } catch (error) {
-            this._myP5 = null;
-            this._emitRuntimeError(error, "setup");
-            this._dom.clear();
-        }
-    }
-
-    stop() {
-        this._myP5?.noLoop();
-    }
-
-    remove() {
-        this._myP5?.remove();
-        this._myP5 = null;
-        this._destCanvas = null;
-        this._dom.clear();
-        this._gfxPool.clear();
-        this._gfxActive = [];
-        this._removed = true;
-    }
-
-    clear() {
-        this.remove();
+        super({ ...config, p5Major: 1 });
     }
 
     toFrame() {
@@ -658,28 +601,9 @@ class P5b extends P5bBase {
     }    
 
     _validateConfig() {
-        if (!Number.isFinite(this.fps) || this.fps <= 0) {
-            throw new Error("Invalid config: fps must be a positive number.");
-        }
-        if (!Number.isInteger(this.width) || this.width <= 0) {
-            throw new Error("Invalid config: width must be a positive integer.");
-        }
-        if (!Number.isInteger(this.height) || this.height <= 0) {
-            throw new Error("Invalid config: height must be a positive integer.");
-        }
-        if (this.preload && typeof this.preload !== "function") {
-            throw new Error("Invalid config: preload must be a function.");
-        }
-        if (this.setup && typeof this.setup !== "function") {
-            throw new Error("Invalid config: setup must be a function.");
-        }
-        if (this.draw && typeof this.draw !== "function") {
-            throw new Error("Invalid config: draw must be a function.");
-        }
+        super._validateConfig();
 
         global.preload = this.preload;
-        global.setup = this.setup;
-        global.draw = this.draw;
     }
 }
 

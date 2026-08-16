@@ -15,151 +15,17 @@ class P5b extends P5bBase {
         this._pendingLoads = 0;
     }
 
-    _buildFont(fontPath, arrayBuffer, parsedFont) {
-        // v2: Font constructor requires (p, fontFace, name, path, data)
-        // Pass a FontFace stub so the instanceof check passes, then attach opentype data.
-        // Use the actual font family name so multiple loaded fonts don't collide on the same CSS family.
-        const family = parsedFont.names?.fontFamily?.en || parsedFont.names?.fullName?.en || "font";
-        const fontFace = new global.FontFace(family, arrayBuffer);
-        const p5Font = new (this._loadP5()).Font(this._myP5, fontFace, family, fontPath, arrayBuffer);
-        p5Font.font = parsedFont;
-        return p5Font;
-    }
-
-    _loadP5() {
-        global.performance = {
-            now: () => Date.now()
-        };
-        // p5.js 2.x Font constructor checks `instanceof FontFace` (browser Web Font API).
-        // Provide a minimal stub: stores family/source, exposes status='loaded' and
-        // the descriptor properties (weight, stretch, style) that p5.js reads.
-        if (!global.FontFace) {
-            global.FontFace = class FontFace {
-                constructor(family, source, descriptors = {}) {
-                    this.family = family;
-                    this.status = "loaded";
-                    this.weight = descriptors.weight || "normal";
-                    this.stretch = descriptors.stretch || "normal";
-                    this.style = descriptors.style || "normal";
-                }
-                load() { return Promise.resolve(this); }
-            };
-        }
-        const p5pkg = process.env.P5B_P5_PATH || "p5";
-        const p5 = require(p5pkg).default || require(p5pkg);
-        // Disable p5.js 2.x FES features that require a real browser environment
-        // (sketch_verifier fetches <script> tags; fes_core checks for removed APIs).
-        // Neither is meaningful in a headless Node.js context.
-        p5.disableFriendlyErrors = true;
-        return p5;
-    }
-
-    _onCanvasCreated(w, h) {
-        // v2: windowWidth/windowHeight are instance properties cached at construction from
-        // window.innerWidth/Height. Update both the cached instance values and the DOM shim
-        // so sketches see canvas dimensions as window dimensions (headless compatibility).
-        if (global.window) {
-            global.window.innerWidth = w;
-            global.window.innerHeight = h;
-        }
-        this._myP5.windowWidth = w;
-        this._myP5.windowHeight = h;
-    }
-
-    _trackNewGraphics(ret, key) {
-        // v2: createGraphics no longer pushes to _elements, so pool via remove() override
-        if (!this._gfxPool.has(key)) this._gfxPool.set(key, []);
-        ret.remove = () => {
-            if (ret.elt && ret.elt.parentNode) {
-                ret.elt.parentNode.removeChild(ret.elt);
-            }
-            if (ret.elt) this._dom.removeTrackedCanvas(ret.elt);
-            this._gfxPool.get(key).push(ret);
-        };
-    }
-
-    _preloadIncrement() {
-        this._pendingLoads++;
-    }
-
-    _preloadDecrement() {
-        this._pendingLoads = Math.max(0, this._pendingLoads - 1);
-    }
-
-    _waitForPreloads(timeoutMs = 10000) {
-        const startedAt = Date.now();
-        return new Promise((resolve, reject) => {
-            const poll = () => {
-                if (this._pendingLoads <= 0) return resolve();
-                if (Date.now() - startedAt >= timeoutMs) {
-                    return reject(new Error(`Timed out waiting for preload to finish (${timeoutMs}ms). ${this._pendingLoads} load(s) pending.`));
-                }
-                setImmediate(poll);
-            };
-            poll();
-        });
-    }
-
-    run() {
-        if (this._removed) {
-            throw new Error("P5b instance has been removed. Create a new instance to run again.");
-        }
-
-        // Resume after stop()
-        if (this._myP5) {
-            this._myP5.loop();
-            this._myP5.redraw();
-            return;
-        }
-
-        // First run
-        const sketch = (pInstance) => {
-            this._myP5 = pInstance;
-            this._bindGlobals();
-            this._initSketch();
-        };
-
-        try {
-            new (this._loadP5())(sketch);
-        } catch (error) {
-            this._myP5 = null;
-            this._emitRuntimeError(error, "setup");
-            this._dom.clear();
-        }
-    }
-
-    stop() {
-        this._myP5?.noLoop();
-    }
-
-    remove() {
-        this._myP5?.remove();
-        this._myP5 = null;
-        this._destCanvas = null;
-        this._dom.clear();
-        this._gfxPool.clear();
-        this._gfxActive = [];
-        this._removed = true;
-    }
-
-    clear() {
-        this.remove();
-    }
-
-    // TODO: need align variable names to v1
     toFrame() {
         const srcCanvas = this._myP5?.canvas;
         if (!srcCanvas) {
             throw new Error("Canvas not initialized. Call run() first.");
         }
 
-        const srcW = srcCanvas.width;
-        const srcH = srcCanvas.height;
         const isP3D = Boolean(this._myP5._renderer?.isP3D);
 
         // Happy path: canvas dimensions match p5b config — return RGBA pixels directly.
         // node-canvas getImageData() (used by loadPixels) and p5 WebGL loadPixels both return RGBA.
-        if (srcW === this.width && srcH === this.height) {
+        if (srcCanvas.width === this.width && srcCanvas.height === this.height) {
             this._myP5.loadPixels();
             return new Uint8Array(this._myP5.pixels.buffer);
         }
@@ -170,9 +36,9 @@ class P5b extends P5bBase {
         let srcDrawable;
         if (isP3D) {
             this._myP5.loadPixels();
-            srcDrawable = canvas.createCanvas(srcW, srcH);
+            srcDrawable = canvas.createCanvas(srcCanvas.width, srcCanvas.height);
             srcDrawable.getContext("2d").putImageData(
-                new canvas.ImageData(new Uint8ClampedArray(this._myP5.pixels.buffer), srcW, srcH),
+                new canvas.ImageData(new Uint8ClampedArray(this._myP5.pixels.buffer), srcCanvas.width, srcCanvas.height),
                 0, 0
             );
         } else {
@@ -188,11 +54,14 @@ class P5b extends P5bBase {
 
         // Fit to destination preserving aspect ratio, top-left aligned (do not stretch).
         // The region outside the fitted frame stays transparent (blank filler).
-        const scaleFactor = Math.min(this.width / srcW, this.height / srcH);
+        const xRatio = this.width / srcCanvas.width;
+        const yRatio = this.height / srcCanvas.height;
+        const scaleFactor = Math.min(xRatio, yRatio);
+
         ctx.drawImage(
             srcDrawable,
-            0, 0, srcW, srcH,
-            0, 0, srcW * scaleFactor, srcH * scaleFactor
+            0, 0, srcCanvas.width, srcCanvas.height,
+            0, 0, srcCanvas.width * scaleFactor, srcCanvas.height * scaleFactor
         );
 
         if (isP3D) {
@@ -200,15 +69,20 @@ class P5b extends P5bBase {
             return new Uint8Array(ctx.getImageData(0, 0, this.width, this.height).data.buffer);
         }
 
-        // node-canvas toBuffer("raw") returns BGRA; swap to RGBA.
-        // const raw = this._destCanvas.toBuffer("raw");
-        // const out = new Uint8Array(raw);
-        // for (let i = 0; i < out.length; i += 4) {
-        //     const b = out[i]; out[i] = out[i + 2]; out[i + 2] = b;
-        // }
-        // return out;
-
         return reorderBuffer(this._destCanvas.toBuffer("raw"));
+    }
+
+    _loadP5() {
+        global.performance = {
+            now: () => Date.now()
+        };
+        const p5pkg = process.env.P5B_P5_PATH || "p5";
+        const p5 = require(p5pkg).default || require(p5pkg);
+        // Disable p5.js 2.x FES features that require a real browser environment
+        // (sketch_verifier fetches <script> tags; fes_core checks for removed APIs).
+        // Neither is meaningful in a headless Node.js context.
+        p5.disableFriendlyErrors = true;
+        return p5;
     }
 
     _initSketch() {
@@ -221,17 +95,17 @@ class P5b extends P5bBase {
         // written to global.preload by vm.runInThisContext() in _bindGlobals().
         // Compare against P5B_DEFAULTS.preload (not this module's noop) so the
         // default no-op preload isn't mistaken for a user-provided one.
-        const userPreload = (typeof this.preload === "function" && this.preload !== P5B_DEFAULTS.preload)
+        const _userPreload = (typeof this.preload === "function" && this.preload !== P5B_DEFAULTS.preload)
             ? this.preload
             // Only sketchPath mode writes the sketch's preload to global.preload (via vm).
             // Gating on sketchPath prevents a stale preload from a prior sketchPath instance
             // leaking into inline-config instances when test files share one process.
             : (this.sketchPath && typeof global.preload === "function" ? global.preload : this.preload);
-        const hasUserPreload = typeof userPreload === "function" && userPreload !== P5B_DEFAULTS.preload;
+        const hasUserPreload = typeof _userPreload === "function" && _userPreload !== P5B_DEFAULTS.preload;
 
         this._myP5.setup = async () => {
             if (hasUserPreload) {
-                try { userPreload(); } catch (error) {
+                try { _userPreload(); } catch (error) {
                     this._emitRuntimeError(error, "preload");
                     this.stop();
                     return;
@@ -399,7 +273,7 @@ class P5b extends P5bBase {
         // in preload and img.width/height are usable in setup/draw after the
         // preload counter clears). The shell is backed by a node-canvas Canvas,
         // so p5.js's image() function can draw it via img.canvas/.drawingContext.
-        global.loadImage = (function(that) {
+        const _p5bLoadImage = (function(that) {
             return function(filePath, onSuccess, onError) {
                 const p5 = that._myP5;
                 if (!p5) {
@@ -452,6 +326,7 @@ class P5b extends P5bBase {
                 return pImg;
             };
         })(this);
+        global.loadImage = _p5bLoadImage;
 
         // Pool-based createGraphics: reuse Graphics objects across frames instead of
         // allocating new Cairo surfaces every draw call. On first use a new object is
@@ -468,8 +343,17 @@ class P5b extends P5bBase {
                 }
                 
                 const ret = cg(w, h, ...rest);
-                // Override .remove() on new graphics so they return to the pool
-                that._trackNewGraphics(ret, key);
+                // Override .remove() on new graphics so they return to the pool.
+                // v2: createGraphics no longer pushes to _elements, so pooling happens
+                // entirely through this override (v1 pools via _elements growth checks).
+                if (!that._gfxPool.has(key)) that._gfxPool.set(key, []);
+                ret.remove = () => {
+                    if (ret.elt && ret.elt.parentNode) {
+                        ret.elt.parentNode.removeChild(ret.elt);
+                    }
+                    if (ret.elt) that._dom.removeTrackedCanvas(ret.elt);
+                    that._gfxPool.get(key).push(ret);
+                };
                 return ret;
             };
         })(this, global.createGraphics);
@@ -804,6 +688,30 @@ class P5b extends P5bBase {
                 }
             };
         })(this);
+    }
+
+    // --- v2-only helpers (not present in p5b_v1.js; tracked preload lifecycle) ---
+
+    _preloadIncrement() {
+        this._pendingLoads++;
+    }
+
+    _preloadDecrement() {
+        this._pendingLoads = Math.max(0, this._pendingLoads - 1);
+    }
+
+    _waitForPreloads(timeoutMs = 10000) {
+        const startedAt = Date.now();
+        return new Promise((resolve, reject) => {
+            const poll = () => {
+                if (this._pendingLoads <= 0) return resolve();
+                if (Date.now() - startedAt >= timeoutMs) {
+                    return reject(new Error(`Timed out waiting for preload to finish (${timeoutMs}ms). ${this._pendingLoads} load(s) pending.`));
+                }
+                setImmediate(poll);
+            };
+            poll();
+        });
     }
 }
 

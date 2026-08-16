@@ -50,6 +50,52 @@ class P5bBase extends EventEmitter {
         return this._metrics;
     }
 
+    run() {
+        if (this._removed) {
+            throw new Error("P5b instance has been removed. Create a new instance to run again.");
+        }
+
+        // Resume after stop()
+        if (this._myP5) {
+            this._myP5.loop();
+            this._myP5.redraw();
+            return;
+        }
+
+        // First run
+        const sketch = (pInstance) => {
+            this._myP5 = pInstance;
+            this._bindGlobals();
+            this._initSketch();
+        };
+
+        try {
+            new (this._loadP5())(sketch);
+        } catch (error) {
+            this._myP5 = null;
+            this._emitRuntimeError(error, "setup");
+            this._dom.clear();
+        }
+    }
+
+    stop() {
+        this._myP5?.noLoop();
+    }
+
+    remove() {
+        this._myP5?.remove();
+        this._myP5 = null;
+        this._destCanvas = null;
+        this._dom.clear();
+        this._gfxPool.clear();
+        this._gfxActive = [];
+        this._removed = true;
+    }
+
+    clear() {
+        this.remove();
+    }
+
     _emitRuntimeError(error, phase) {
         this._metrics.errors++;
         this.emit("error", { phase, error });
