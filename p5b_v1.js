@@ -132,7 +132,11 @@ class P5b extends P5bBase {
         this._myP5.draw = _wrappedDraw;
     }
 
+    _propertySetter(key, val) { if (this._myP5) this._myP5[key] = val; }
+
     _bindGlobals() {
+        super._bindGlobals();
+
         // Walk prototype chain to bind all functions and key properties
         for (const key in this._myP5) {
             const value = this._myP5[key];
@@ -143,7 +147,7 @@ class P5b extends P5bBase {
                 // Bind non-private properties (like frameCount, width, height)
                 Object.defineProperty(global, key, {
                     get: () => this._myP5?.[key],
-                    set: (val) => { if (this._myP5) this._myP5[key] = val; },
+                    set: this._propertySetter(key, value),
                     configurable: true
                 });
             }

@@ -124,6 +124,15 @@ class P5bBase extends EventEmitter {
         global.setup = this.setup;
         global.draw = this.draw;
     }
+
+    // TODO: is this needed?
+    _propertySetter(key, value) {
+        throw new Error("_propertySetter(key, value) must be implemented.");
+    }
+
+    _bindGlobals() {
+        // TODO: fill me in
+    }
 }
 
 module.exports = { P5bBase, P5B_DEFAULTS, reorderBuffer };
