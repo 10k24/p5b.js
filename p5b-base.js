@@ -14,7 +14,8 @@ const P5B_DEFAULTS = {
     height: 32,
     fps: 60,
     setup: noop,
-    draw: noop
+    draw: noop,
+    maxPoolSize: 4
 };
 
 // Swap pixel data order BGRA -> RGBA. Shared by both adapters' toFrame() scale path
@@ -117,6 +118,9 @@ class P5bBase extends EventEmitter {
         }
         if (this.draw && typeof this.draw !== "function") {
             throw new Error("Invalid config: draw must be a function.");
+        }
+        if (!Number.isFinite(this.maxPoolSize) || this.maxPoolSize < 0) {
+            throw new Error("Invalid config: maxPoolSize must be a number >= 0.");
         }
     }
 
@@ -352,6 +356,75 @@ class P5bBase extends EventEmitter {
                 if (typeof wr === "function") wr();
             };
         })(this, global.windowResized);
+    }
+
+    _gfxAcquire(key) {
+        const bucket = this._gfxPool.get(key);
+        if (!bucket || bucket.length === 0) return null;
+        const pg = bucket.pop();
+        this._gfxActive.push({ pg, key });
+        this._resetGraphics(pg);
+        return pg;
+    }
+
+    _gfxReturnToPool(key, pg) {
+        let bucket = this._gfxPool.get(key);
+        if (!bucket) { bucket = []; this._gfxPool.set(key, bucket); }
+        if (bucket.length < this.maxPoolSize) bucket.push(pg);
+    }
+
+    _resetGraphics(pg) {
+        pg.clear();
+        pg.resetMatrix();
+        pg.fill(255);
+        pg.stroke(0);
+        pg.noTint();
+    }
+
+    // Both p5 versions call draw() from their own animation loop and may invoke
+    // global.draw directly (not just this._myP5.draw), so the wrapper must live on
+    // global.draw to catch errors and emit frames regardless of the invocation path.
+    // Capture after _bindGlobals() runs (the sketch may have overwritten global.draw via vm).
+    _initDrawWrapper() {
+        const _userDraw = global.draw;
+        const _wrappedDraw = () => {
+            if (!this._myP5) return;
+            try {
+                // Block animation loop calls when stopped, but always allow redraw() through
+                if (!this._redrawing && this._metrics.framesDrawn > 0 && !this._myP5.isLooping()) {
+                    return;
+                }
+
+                const elemsBefore = this._myP5._elements.length;
+                _userDraw.call(this._myP5);
+
+                // Return pool-checked-out graphics objects back to the pool
+                for (const { pg, key } of this._gfxActive) {
+                    this._gfxReturnToPool(key, pg);
+                }
+                this._gfxActive = [];
+
+                // Pool any newly created graphics objects (from _elements growth).
+                // Remove their canvases from the DOM helper's tracking lists.
+                while (this._myP5._elements.length > elemsBefore) {
+                    const el = this._myP5._elements.pop();
+                    if (el && el.elt) {
+                        this._dom.removeTrackedCanvas(el.elt);
+                        const key = `${el.elt.width}:${el.elt.height}`;
+                        this._gfxReturnToPool(key, el);
+                    }
+                }
+
+                this._metrics.framesDrawn++;
+                this.emit("frame", this.toFrame());
+            } catch (error) {
+                this._gfxActive = [];
+                this._emitRuntimeError(error, "draw");
+                this.stop();
+            }
+        };
+        global.draw = _wrappedDraw;
+        this._myP5.draw = _wrappedDraw;
     }
 }
 

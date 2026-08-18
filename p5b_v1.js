@@ -87,50 +87,7 @@ class P5b extends P5bBase {
             finally { this._redrawing = false; }
         };
 
-        // p5 v1 calls global.draw() directly from its animation loop (not this._myP5.draw),
-        // so the try-catch wrapper must live in global.draw, not just this._myP5.draw.
-        // Capture after _bindGlobals() runs (sketch may have overwritten global.draw via vm).
-        const _userDraw = global.draw;
-        const _wrappedDraw = () => {
-            if (!this._myP5) return;
-            try {
-                // Block animation loop calls when stopped, but always allow redraw() through
-                if (!this._redrawing && this._metrics.framesDrawn > 0 && !this._myP5.isLooping()) {
-                    return;
-                }
-
-                const elemsBefore = this._myP5._elements.length;
-                _userDraw.call(this._myP5);
-
-                // Return pool-checked-out graphics objects back to the pool
-                for (const { pg, key } of this._gfxActive) {
-                    const bucket = this._gfxPool.get(key);
-                    if (bucket) bucket.push(pg);
-                }
-                this._gfxActive = [];
-
-                // Pool any newly created graphics objects (from _elements growth).
-                // Remove their canvases from the DOM helper's tracking lists.
-                while (this._myP5._elements.length > elemsBefore) {
-                    const el = this._myP5._elements.pop();
-                    if (el && el.elt) {
-                        this._dom.removeTrackedCanvas(el.elt);
-                        const key = `${el.elt.width}:${el.elt.height}`;
-                        if (!this._gfxPool.has(key)) this._gfxPool.set(key, []);
-                        this._gfxPool.get(key).push(el);
-                    }
-                }
-
-                this._metrics.framesDrawn++;
-                this.emit("frame", this.toFrame());
-            } catch (error) {
-                this._gfxActive = [];
-                this._emitRuntimeError(error, "draw");
-                this.stop();
-            }
-        };
-        global.draw = _wrappedDraw;
-        this._myP5.draw = _wrappedDraw;
+        this._initDrawWrapper();
     }
 
     _propertySetter(key, val) { if (this._myP5) this._myP5[key] = val; }
@@ -237,15 +194,10 @@ class P5b extends P5bBase {
         global.createGraphics = (function(that, cg) {
             return function(w, h, ...rest) {
                 const key = `${w}:${h}`;
-                const bucket = that._gfxPool.get(key);
-                if (bucket && bucket.length > 0) {
-                    const pg = bucket.pop();
-                    that._gfxActive.push({ pg, key });
-                    return pg;
-                }
+                const pg = that._gfxAcquire(key);
+                if (pg) return pg;
                 
                 const ret = cg(w, h, ...rest);
-                // Override .remove() on new graphics before they're used
                 ret.remove = function() {
                     if (this.elt && this.elt.parentNode) {
                         this.elt.parentNode.removeChild(this.elt);
