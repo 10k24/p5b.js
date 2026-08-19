@@ -48,14 +48,6 @@ class P5b extends P5bBase {
         return reorderBuffer(this._destCanvas.toBuffer("raw"));
     }
 
-    _loadP5() {
-        global.performance = {
-            now: () => Date.now()
-        };
-        const p5pkg = process.env.P5B_P5_PATH || "p5";
-        return require(p5pkg).default || require(p5pkg);
-    }
-
     _initSketch() {
         this._myP5.frameRate(this.fps);
 
@@ -90,7 +82,11 @@ class P5b extends P5bBase {
         this._initDrawWrapper();
     }
 
-    _propertySetter(key, val) { if (this._myP5) this._myP5[key] = val; }
+    _propertySetter(key, val) {
+        if (this._myP5) {
+            this._myP5[key] = val;
+        }
+    }
 
     _bindGlobals() {
         super._bindGlobals();
@@ -325,11 +321,6 @@ class P5b extends P5bBase {
                 }
             };
         })(this);
-    }
-
-    _emitRuntimeError(error, phase) {
-        this._metrics.errors++;
-        this.emit("error", { phase, error });
     }
 
     _validateConfig() {

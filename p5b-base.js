@@ -98,6 +98,14 @@ class P5bBase extends EventEmitter {
         this.remove();
     }
 
+    _loadP5() {
+        global.performance = {
+            now: () => Date.now()
+        };
+        const p5pkg = process.env.P5B_P5_PATH || "p5";
+        return require(p5pkg).default || require(p5pkg);
+    }
+
     _emitRuntimeError(error, phase) {
         this._metrics.errors++;
         this.emit("error", { phase, error });

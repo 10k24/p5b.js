@@ -88,11 +88,7 @@ class P5b extends P5bBase {
     }
 
     _loadP5() {
-        global.performance = {
-            now: () => Date.now()
-        };
-        const p5pkg = process.env.P5B_P5_PATH || "p5";
-        const p5 = require(p5pkg).default || require(p5pkg);
+        const p5 = super._loadP5();
         // Disable p5.js 2.x FES features that require a real browser environment
         // (sketch_verifier fetches <script> tags; fes_core checks for removed APIs).
         // Neither is meaningful in a headless Node.js context.
@@ -140,7 +136,13 @@ class P5b extends P5bBase {
         this._initDrawWrapper();
     }
 
-    _propertySetter(key, val) { if (this._myP5) try { this._myP5[key] = val; } catch (_) { /* readonly in p5 2.x */ } }
+    _propertySetter(key, val) {
+        if (this._myP5) {
+            try {
+                this._myP5[key] = val;
+            } catch (_) { /* readonly in p5 2.x */ }
+        }
+    }
 
     _bindGlobals() {
         super._bindGlobals();
@@ -181,11 +183,12 @@ class P5b extends P5bBase {
             };
         })(this);
 
-        // loadImage: mirrors p5.js's original loadImage contract exactly.
-        // Returns a p5.Image shell synchronously (so img = loadImage(path) works
-        // in preload and img.width/height are usable in setup/draw after the
-        // preload counter clears). The shell is backed by a node-canvas Canvas,
-        // so p5.js's image() function can draw it via img.canvas/.drawingContext.
+        // loadImage: p5 v2's native loadImage() is async and returns a Promise.
+        // p5b's wrapper does the same: returns a Promise<p5.Image> so callers can
+        // use `const img = await loadImage(path)` in async setup(). The shell is
+        // backed by a node-canvas Canvas, so p5.js's image() function can draw it
+        // via img.canvas/.drawingContext. Legacy onSuccess/onError callbacks are
+        // still supported for backward compatibility.
         const _p5bLoadImage = (function(that) {
             return function(filePath, onSuccess, onError) {
                 const p5 = that._myP5;
@@ -197,46 +200,47 @@ class P5b extends P5bBase {
 
                 const resolvedPath = global._resolveAssetPath(that.sketchPath, filePath);
                 const url = filePath.startsWith("http") ? filePath : `file://${resolvedPath}`;
-                let pImg;
 
-                const loadImageData = (imageData) => {
-                    const rawImg = new canvas.Image();
-                    rawImg.onload = () => {
-                        pImg = new (that._loadP5()).Image(rawImg.width, rawImg.height);
-                        pImg.drawingContext.drawImage(rawImg, 0, 0);
-                        // Ignoring for now, only needed for webGL to refresh textures
-                        // pImg.modified = true;
-                        if (onSuccess) onSuccess(pImg);
-                        setImmediate(() => that._preloadDecrement());
+                return new Promise((resolve, reject) => {
+                    const loadImageData = (imageData) => {
+                        const rawImg = new canvas.Image();
+                        rawImg.onload = () => {
+                            const pImg = new (that._loadP5()).Image(rawImg.width, rawImg.height);
+                            pImg.drawingContext.drawImage(rawImg, 0, 0);
+                            // Ignoring for now, only needed for webGL to refresh textures
+                            // pImg.modified = true;
+                            if (onSuccess) onSuccess(pImg);
+                            setImmediate(() => that._preloadDecrement());
+                            resolve(pImg);
+                        };
+                        rawImg.onerror = (err) => handleError(err instanceof Error ? err : new Error(String(err)));
+                        rawImg.src = Buffer.from(imageData);
                     };
-                    rawImg.onerror = (err) => handleError(err instanceof Error ? err : new Error(String(err)));
-                    rawImg.src = Buffer.from(imageData);
-                };
 
-                const handleError = (error) => {
-                    setImmediate(() => that._preloadDecrement());
-                    if (onError) onError(error);
-                    else console.error(`Failed to load image: ${error.message}`);
-                };
+                    const handleError = (error) => {
+                        setImmediate(() => that._preloadDecrement());
+                        if (onError) onError(error);
+                        else console.error(`Failed to load image: ${error.message}`);
+                        reject(error);
+                    };
 
-                if (url.startsWith("file://")) {
-                    try {
-                        const buf = fs.readFileSync(resolvedPath);
-                        loadImageData(buf.buffer.slice(buf.byteOffset, buf.byteOffset + buf.byteLength));
-                    } catch (error) {
-                        handleError(error);
+                    if (url.startsWith("file://")) {
+                        try {
+                            const buf = fs.readFileSync(resolvedPath);
+                            loadImageData(buf.buffer.slice(buf.byteOffset, buf.byteOffset + buf.byteLength));
+                        } catch (error) {
+                            handleError(error);
+                        }
+                    } else {
+                        global.fetch(url)
+                            .then(response => {
+                                if (!response.ok) throw new Error(`Failed to load image: ${response.status} ${response.statusText}`);
+                                return response.arrayBuffer();
+                            })
+                            .then(buf => loadImageData(buf))
+                            .catch(handleError);
                     }
-                } else {
-                    global.fetch(url)
-                        .then(response => {
-                            if (!response.ok) throw new Error(`Failed to load image: ${response.status} ${response.statusText}`);
-                            return response.arrayBuffer();
-                        })
-                        .then(buf => loadImageData(buf))
-                        .catch(handleError);
-                }
-
-                return pImg;
+                });
             };
         })(this);
         global.loadImage = _p5bLoadImage;
