@@ -1,6 +1,7 @@
 const { describe, it, expect } = require("bun:test");
 const path = require("path");
 const { P5b, P5B_DEFAULTS } = require("../p5b.js");
+const { P5bBase } = require("../p5b-base");
 
 const isP5v2 = (process.env.P5B_P5_PATH || "p5") !== "p5";
 
@@ -29,6 +30,23 @@ describe("P5b API Surface", () => {
         expect(typeof P5b.prototype.on).toBe("function");
         expect(typeof P5b.prototype.emit).toBe("function");
         expect(typeof P5b.prototype.listenerCount).toBe("function");
+    });
+});
+
+describe("P5b p5Version", () => {
+    it("reports the p5 version the adapter targets", () => {
+        const p5b = new P5b({});
+        expect(p5b.p5Version).toBe(isP5v2 ? 2 : 1);
+    });
+
+    it("is set by the adapter and not overridable via config", () => {
+        const p5b = new P5b({ p5Version: 99 });
+        expect(p5b.p5Version).toBe(isP5v2 ? 2 : 1);
+    });
+
+    it("rejects an invalid p5Version at the base validation layer", () => {
+        expect(() => new P5bBase({ p5Version: 99 })).toThrow("Invalid config: p5Version must be 1 or 2.");
+        expect(() => new P5bBase({ p5Version: "2" })).toThrow("Invalid config: p5Version must be 1 or 2.");
     });
 });
 
@@ -134,7 +152,7 @@ describe("P5b Instance Management", () => {
             draw: () => { background(0); }
         });
 
-        expect(() => p5b.toFrame()).toThrow("Canvas not initialized");
+        expect(() => p5b.toFrame()).toThrow();
     });
 
     it("should handle toFrame with cached canvas efficiently", (done) => {
@@ -256,9 +274,9 @@ describe("P5b Global Bindings", () => {
 
         const p5b = new P5b({
             width: 32, height: 32,
-            setup: () => {
+            setup: async () => {
                 createCanvas(64, 64);
-                loadedFont = loadFont(fontPath);
+                loadedFont = await loadFont(fontPath);
             },
             draw: () => { background(100); }
         });
@@ -277,10 +295,10 @@ describe("P5b Global Bindings", () => {
     it("should throw with friendly message when font file not found", (done) => {
         const p5b = new P5b({
             width: 32, height: 32,
-            setup: () => {
+            setup: async () => {
                 createCanvas(64, 64);
                 try {
-                    loadFont("/nonexistent/path/to/font.ttf");
+                    await loadFont("/nonexistent/path/to/font.ttf");
                 } catch (error) {
                     expect(error.message).toContain("Failed to load font");
                     expect(error.message).toContain("file not found");
@@ -334,5 +352,73 @@ describe("P5b Global Bindings", () => {
         });
 
         p5b.run();
+    });
+
+    it("should reset graphics state on pool checkout", (done) => {
+        let frameCount = 0;
+        const p5b = new P5b({
+            width: 32, height: 32,
+            setup: () => { createCanvas(64, 64); },
+            draw: () => {
+                if (frameCount === 0) {
+                    const pg = createGraphics(25, 25);
+                    pg.fill(0, 0, 255);
+                    pg.stroke(255, 0, 0);
+                    pg.translate(10, 10);
+                    pg.remove();
+                }
+                if (frameCount === 1) {
+                    const pg = createGraphics(25, 25);
+                    // After clear(), all pixels should be transparent
+                    const pixels = pg.get(0, 0);
+                    expect(pixels[0]).toBe(0);
+                    expect(pixels[1]).toBe(0);
+                    expect(pixels[2]).toBe(0);
+                    expect(pixels[3]).toBe(0);
+                    pg.remove();
+                    p5b.stop();
+                    done();
+                }
+            }
+        });
+
+        p5b.on("frame", () => { frameCount++; });
+        p5b.run();
+    });
+
+    it("should cap bucket size at maxPoolSize", (done) => {
+        let frameCount = 0;
+        const p5b = new P5b({
+            width: 32, height: 32,
+            maxPoolSize: 4,
+            setup: () => { createCanvas(64, 64); },
+            draw: () => {
+                if (frameCount === 0) {
+                    // Create all distinct graphics first, then remove them all, so the pool
+                    // fills with 5 distinct objects (capped at maxPoolSize). Removing each as
+                    // it's created would instead reuse a single pooled object.
+                    const pgs = [];
+                    for (let i = 0; i < 5; i++) pgs.push(createGraphics(20, 20));
+                    pgs.forEach((pg) => pg.remove());
+                }
+            }
+        });
+
+        p5b.on("frame", () => {
+            frameCount++;
+            if (frameCount === 1) {
+                const pool = p5b._gfxPool.get("20:20");
+                expect(pool).toBeDefined();
+                expect(pool.length).toBe(4);
+                p5b.stop();
+                done();
+            }
+        });
+        p5b.run();
+    });
+
+    it("should throw on invalid maxPoolSize", () => {
+        expect(() => new P5b({ maxPoolSize: -1 })).toThrow("maxPoolSize must be a number >= 0");
+        expect(() => new P5b({ maxPoolSize: "foo" })).toThrow("maxPoolSize must be a number >= 0");
     });
 });

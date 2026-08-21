@@ -1,5 +1,5 @@
 /* eslint-disable no-undef */
-const { describe, it, expect } = require("bun:test");
+const { describe: desc, it, expect } = require("bun:test");
 const path = require("path");
 
 // Detect p5 version for skipping v2-incompatible tests
@@ -9,7 +9,7 @@ const { P5b } = require("../../p5b");
 // TODO: build out more utils like this for brevity
 const doneErr = (err) => { p5b.stop(); done(err.error); };
 
-describe("P5b Integration - Buffer Analysis", () => {
+desc("P5b Integration - Buffer Analysis", () => {
     function testBackgroundColorScenarios(done) {
         const scenarios = [
             {
@@ -660,7 +660,7 @@ describe("P5b Integration - Buffer Analysis", () => {
     });
 });
 
-describe("P5b Integration - Graphics Pooling", () => {
+desc("P5b Integration - Graphics Pooling", () => {
     it("should create and remove graphics without throwing", (done) => {
         const p5b = new P5b({
             width: 32, height: 32,
@@ -776,7 +776,7 @@ describe("P5b Integration - Graphics Pooling", () => {
     });
 });
 
-describe("P5b Integration - loadImage", () => {
+desc("P5b Integration - loadImage", () => {
     it.skipIf(isP5v2)("should load image in preload and render in draw", (done) => {
         const testImagePath = path.join(process.cwd(), "test/fixtures/img/natalie-kinnear-CC2Bfvk2-tU-unsplash.jpg");
         let loadedImg = null;
@@ -953,7 +953,7 @@ describe("P5b Integration - loadImage", () => {
     });
 });
 
-describe("P5b Integration - windowResized", () => {
+desc("P5b Integration - windowResized", () => {
     it("should call user-defined windowResized handler", (done) => {
         let windowResizedCalled = false;
 
@@ -1006,7 +1006,7 @@ describe("P5b Integration - windowResized", () => {
     });
 });
 
-describe("P5b Integration - WEBGL Mode", () => {
+desc("P5b Integration - WEBGL Mode", () => {
     it("should emit error when WEBGL mode is requested", (done) => {
         const p5b = new P5b({
             width: 32, height: 32,
@@ -1030,9 +1030,10 @@ describe("P5b Integration - WEBGL Mode", () => {
     });
 });
 
-describe("P5b Integration - Time Functions", () => {
+desc("P5b Integration - Time Functions", () => {
     it("should return current time values matching native Date", (done) => {
         const now = new Date();
+        const results = {};
         
         const p5b = new P5b({
             width: 16, height: 16,
@@ -1041,7 +1042,6 @@ describe("P5b Integration - Time Functions", () => {
                 createCanvas(100, 100);
             },
             draw: () => {
-                const results = global.results = {};
                 results.year = year();
                 results.month = month();
                 results.day = day();
@@ -1056,15 +1056,15 @@ describe("P5b Integration - Time Functions", () => {
         p5b.on("error", doneErr);
         
         p5b.on("frame", (buffer) => {
-            expect(global.results.year).toBe(now.getFullYear());
-            expect(global.results.month).toBe(now.getMonth() + 1);
-            expect(global.results.day).toBe(now.getDate());
-            expect(global.results.hour).toBe(now.getHours());
+            expect(results.year).toBe(now.getFullYear());
+            expect(results.month).toBe(now.getMonth() + 1);
+            expect(results.day).toBe(now.getDate());
+            expect(results.hour).toBe(now.getHours());
             // Relaxed test for minute/second due to timing gap
-            expect(Math.abs(global.results.minute - now.getMinutes())).toBeLessThanOrEqual(1);
-            expect(Math.abs(global.results.second - now.getSeconds())).toBeLessThanOrEqual(2);
-            expect(global.results.millis).toBeGreaterThanOrEqual(0);
-            expect(global.results.millis).toBeLessThanOrEqual(999);
+            expect(Math.abs(results.minute - now.getMinutes())).toBeLessThanOrEqual(1);
+            expect(Math.abs(results.second - now.getSeconds())).toBeLessThanOrEqual(2);
+            expect(results.millis).toBeGreaterThanOrEqual(0);
+            expect(results.millis).toBeLessThanOrEqual(999);
             p5b.stop();
             done();
         });
@@ -1073,24 +1073,25 @@ describe("P5b Integration - Time Functions", () => {
     });
 });
 
-describe("P5b Integration - Environment Functions", () => {
+desc("P5b Integration - Environment Functions", () => {
     it("should return current frameRate from p5 instance", (done) => {
+        const results = {};
         const p5b = new P5b({
             width: 16, height: 16,
             fps: 30,
             setup: () => { createCanvas(100, 100); },
             draw: () => {
                 const currentFps = frameRate();
-                global.results.fps = currentFps;
-                global.results.target_fps = getTargetFrameRate();
+                results.fps = currentFps;
+                results.target_fps = getTargetFrameRate();
                 noLoop();
             }
         });
         
         p5b.on("frame", (buffer) => {
             // Framerate seems to be 34 for some reason
-            expect(Math.floor(global.results.fps) - 30).toBeLessThan(5);
-            expect(global.results.target_fps).toBe(30);
+            expect(Math.floor(results.fps) - 30).toBeLessThan(5);
+            expect(results.target_fps).toBe(30);
             p5b.stop();
             done();
         });
@@ -1099,17 +1100,18 @@ describe("P5b Integration - Environment Functions", () => {
     });
 
     it("should track isLooping state", (done) => {
+        const results = {};
         const p5b = new P5b({
             width: 16, height: 16,
             fps: 30,
             setup: () => { createCanvas(100, 100); noLoop(); },
             draw: () => {
-                global.results.isLooping = isLooping();
+                results.isLooping = isLooping();
             }
         });
         
         p5b.on("frame", (buffer) => {
-            expect(global.results.isLooping).toBe(false);
+            expect(results.isLooping).toBe(false);
             p5b.stop();
             done();
         });
@@ -1118,7 +1120,7 @@ describe("P5b Integration - Environment Functions", () => {
     });
 });
 
-describe("P5b Integration - Loop Control", () => {
+desc("P5b Integration - Loop Control", () => {
     it("should emit frames continuously when looping", (done) => {
         let frameCount = 0;
         const p5b = new P5b({
@@ -1485,7 +1487,7 @@ describe("P5b Integration - Loop Control", () => {
     });
 });
 
-describe("P5b Integration - imageMode", () => {
+desc("P5b Integration - imageMode", () => {
     it("imageMode(CORNER) vs imageMode(CENTER) place the same image at different positions", (done) => {
         // Draw 20x20 red image at coords (50,50) in two consecutive frames with different modes.
         // CORNER: top-left at (50,50) → covers x:50-69, y:50-69. px(65,65)=red, px(45,45)=black.
@@ -1573,7 +1575,7 @@ describe("P5b Integration - imageMode", () => {
     });
 });
 
-describe("P5b Integration - Mode/Style Functions", () => {
+desc("P5b Integration - Mode/Style Functions", () => {
     // Helper: render one frame on a 100x100 canvas, return pixel reader
     function renderFrame(sketchConfig, cb) {
         const p5b = new P5b({ width: 100, height: 100, fps: 60, ...sketchConfig });
@@ -1820,24 +1822,25 @@ describe("P5b Integration - Mode/Style Functions", () => {
 
     // v2: strokeJoin() correctly sets drawingContext.lineJoin — verified at the canvas API level.
     it.skipIf(!isP5v2)("v2: strokeJoin() sets drawingContext.lineJoin", (done) => {
+        let miterJoin, bevelJoin, roundJoin;
         const p5b = new P5b({
             width: 100, height: 100, fps: 60,
             setup: () => { createCanvas(100, 100); },
             draw: () => {
                 strokeJoin(MITER);
-                global._miterJoin = drawingContext.lineJoin;
+                miterJoin = drawingContext.lineJoin;
                 strokeJoin(BEVEL);
-                global._bevelJoin = drawingContext.lineJoin;
+                bevelJoin = drawingContext.lineJoin;
                 strokeJoin(ROUND);
-                global._roundJoin = drawingContext.lineJoin;
+                roundJoin = drawingContext.lineJoin;
                 noLoop();
             }
         });
         p5b.on("error", (e) => { p5b.stop(); done(e.error); });
         p5b.on("frame", () => {
-            expect(global._miterJoin).toBe("miter");
-            expect(global._bevelJoin).toBe("bevel");
-            expect(global._roundJoin).toBe("round");
+            expect(miterJoin).toBe("miter");
+            expect(bevelJoin).toBe("bevel");
+            expect(roundJoin).toBe("round");
             p5b.stop();
             done();
         });
@@ -1845,19 +1848,20 @@ describe("P5b Integration - Mode/Style Functions", () => {
     });
 });
 
-describe("P5b Integration - Typography", () => {
+desc("P5b Integration - Typography", () => {
     it("textWidth() returns 0 for empty string", (done) => {
+        let twEmpty;
         const p5b = new P5b({
             width: 100, height: 100, fps: 60,
             setup: () => { createCanvas(100, 100); },
             draw: () => {
                 textSize(20);
-                global._tw_empty = textWidth("");
+                twEmpty = textWidth("");
                 noLoop();
             }
         });
         p5b.on("frame", () => {
-            expect(global._tw_empty).toBe(0);
+            expect(twEmpty).toBe(0);
             p5b.stop();
             done();
         });
@@ -1865,17 +1869,18 @@ describe("P5b Integration - Typography", () => {
     });
 
     it("textWidth() returns positive value for non-empty string", (done) => {
+        let twHello;
         const p5b = new P5b({
             width: 100, height: 100, fps: 60,
             setup: () => { createCanvas(100, 100); },
             draw: () => {
                 textSize(20);
-                global._tw_hello = textWidth("Hello");
+                twHello = textWidth("Hello");
                 noLoop();
             }
         });
         p5b.on("frame", () => {
-            expect(global._tw_hello).toBeGreaterThan(0);
+            expect(twHello).toBeGreaterThan(0);
             p5b.stop();
             done();
         });
@@ -1883,18 +1888,19 @@ describe("P5b Integration - Typography", () => {
     });
 
     it("textWidth() longer string is wider than shorter string", (done) => {
+        let twShort, twLong;
         const p5b = new P5b({
             width: 100, height: 100, fps: 60,
             setup: () => { createCanvas(100, 100); },
             draw: () => {
                 textSize(20);
-                global._tw_short = textWidth("Hi");
-                global._tw_long = textWidth("Hello World");
+                twShort = textWidth("Hi");
+                twLong = textWidth("Hello World");
                 noLoop();
             }
         });
         p5b.on("frame", () => {
-            expect(global._tw_long).toBeGreaterThan(global._tw_short);
+            expect(twLong).toBeGreaterThan(twShort);
             p5b.stop();
             done();
         });
@@ -1902,6 +1908,7 @@ describe("P5b Integration - Typography", () => {
     });
 
     it("textStyle(BOLD) produces wider glyphs than textStyle(NORMAL) with Arial", (done) => {
+        let twNormal, twBold;
         const p5b = new P5b({
             width: 100, height: 100, fps: 60,
             setup: () => { createCanvas(100, 100); },
@@ -1909,14 +1916,14 @@ describe("P5b Integration - Typography", () => {
                 textFont("Arial");
                 textSize(20);
                 textStyle(NORMAL);
-                global._tw_normal = textWidth("Hello World");
+                twNormal = textWidth("Hello World");
                 textStyle(BOLD);
-                global._tw_bold = textWidth("Hello World");
+                twBold = textWidth("Hello World");
                 noLoop();
             }
         });
         p5b.on("frame", () => {
-            expect(global._tw_bold).toBeGreaterThan(global._tw_normal);
+            expect(twBold).toBeGreaterThan(twNormal);
             p5b.stop();
             done();
         });
@@ -1924,17 +1931,18 @@ describe("P5b Integration - Typography", () => {
     });
 
     it("textStyle() getter returns the current style", (done) => {
+        let currentStyle;
         const p5b = new P5b({
             width: 100, height: 100, fps: 60,
             setup: () => { createCanvas(100, 100); },
             draw: () => {
                 textStyle(ITALIC);
-                global._ts = textStyle();
+                currentStyle = textStyle();
                 noLoop();
             }
         });
         p5b.on("frame", () => {
-            expect(global._ts).toBe("italic");
+            expect(currentStyle).toBe("italic");
             p5b.stop();
             done();
         });
@@ -1942,17 +1950,18 @@ describe("P5b Integration - Typography", () => {
     });
 
     it("textLeading() getter/setter round-trips", (done) => {
+        let leading;
         const p5b = new P5b({
             width: 100, height: 100, fps: 60,
             setup: () => { createCanvas(100, 100); },
             draw: () => {
                 textLeading(30);
-                global._tl = textLeading();
+                leading = textLeading();
                 noLoop();
             }
         });
         p5b.on("frame", () => {
-            expect(global._tl).toBe(30);
+            expect(leading).toBe(30);
             p5b.stop();
             done();
         });
@@ -2058,7 +2067,7 @@ describe("P5b Integration - Typography", () => {
     });
 });
 
-describe("P5b Integration - Data/IO", () => {
+desc("P5b Integration - Data/IO", () => {
     it.skipIf(isP5v2)("loadStrings() in preload returns array of lines", (done) => {
         const txtPath = path.resolve(process.cwd(), "test/fixtures/data/test.txt");
         let lines;
@@ -2143,10 +2152,9 @@ describe("P5b Integration - Data/IO", () => {
 
         const p5b = new P5b({
             width: 16, height: 16, fps: 30,
-            setup: () => {
+            setup: async () => {
                 createCanvas(16, 16);
-                // preload is v1-only (rejected in v2); v2 loadTable() is synchronous
-                table = loadTable(csvPath, "csv", "header");
+                table = await loadTable(csvPath, "csv", "header");
             },
             draw: () => { noLoop(); }
         });
@@ -2155,8 +2163,8 @@ describe("P5b Integration - Data/IO", () => {
         p5b.on("frame", () => {
             expect(table).toBeDefined();
             expect(table.getRowCount()).toBe(3);
-            // P5b patches v2's TableRow string-column lookups to v1 semantics,
-            // so column names work (upstream v2 reads the wrong obj slot).
+            // Freshly-loaded rows: getString by column name works (obj is positional),
+            // matching real p5 v2 browser behavior.
             expect(table.getString(0, "name")).toBe("Alice");
             expect(table.getString(1, "name")).toBe("Bob");
             expect(table.getString(2, "name")).toBe("Carol");
@@ -2196,10 +2204,9 @@ describe("P5b Integration - Data/IO", () => {
 
         const p5b = new P5b({
             width: 16, height: 16, fps: 30,
-            setup: () => {
+            setup: async () => {
                 createCanvas(16, 16);
-                // preload is v1-only (rejected in v2); v2 loadTable() is synchronous
-                table = loadTable(csvPath, "csv");
+                table = await loadTable(csvPath, "csv");
             },
             draw: () => { noLoop(); }
         });
@@ -2214,29 +2221,29 @@ describe("P5b Integration - Data/IO", () => {
         p5b.run();
     });
 
-    it.skipIf(!isP5v2)("v2: TableRow string-column set()/get() reads updated values (upstream get bug patched)", (done) => {
+    it.skipIf(!isP5v2)("v2: TableRow string-column set()/get() matches native p5 v2 (stale read after set)", (done) => {
         const csvPath = path.resolve(process.cwd(), "test/fixtures/data/test.csv");
         let table;
 
         const p5b = new P5b({
             width: 16, height: 16, fps: 30,
-            setup: () => {
+            setup: async () => {
                 createCanvas(16, 16);
-                // preload is v1-only (rejected in v2); v2 loadTable() is synchronous
-                table = loadTable(csvPath, "csv", "header");
+                table = await loadTable(csvPath, "csv", "header");
             },
             draw: () => { noLoop(); }
         });
 
         p5b.on("error", (e) => { p5b.stop(); done(e.error); });
         p5b.on("frame", () => {
-            // Upstream v2 reads the stale positional slot after set(); P5b patches the
-            // TableRow prototype so name lookups return the updated value (v1 semantics).
+            // Reproduce upstream p5 v2 behavior: set() writes obj[column] + arr[index], but
+            // get() reads obj[index] (positional), which set() never updates — so the read
+            // returns the stale pre-set value. p5b does not patch this; it matches the browser.
             const row = table.getRow(0);
             row.set("name", "George");
-            expect(row.get("name")).toBe("George");
+            expect(row.get("name")).toBe("Alice");
             row.setNum("age", 31);
-            expect(row.getNum("age")).toBe(31);
+            expect(row.getNum("age")).toBe(30);
             p5b.stop();
             done();
         });
@@ -2244,22 +2251,23 @@ describe("P5b Integration - Data/IO", () => {
     });
 });
 
-describe("P5b Integration - drawingContext", () => {
+desc("P5b Integration - drawingContext", () => {
     it("drawingContext is defined after createCanvas and exposes canvas 2D API", (done) => {
+        let dc;
         const p5b = new P5b({
             width: 100, height: 100, fps: 60,
             setup: () => { createCanvas(100, 100); },
             draw: () => {
-                global._dc = drawingContext;
+                dc = drawingContext;
                 noLoop();
             }
         });
         p5b.on("error", (e) => { p5b.stop(); done(e.error); });
         p5b.on("frame", () => {
-            expect(global._dc).toBeDefined();
-            expect(typeof global._dc.fillRect).toBe("function");
-            expect(typeof global._dc.drawImage).toBe("function");
-            expect(typeof global._dc.getImageData).toBe("function");
+            expect(dc).toBeDefined();
+            expect(typeof dc.fillRect).toBe("function");
+            expect(typeof dc.drawImage).toBe("function");
+            expect(typeof dc.getImageData).toBe("function");
             p5b.stop();
             done();
         });
@@ -2290,7 +2298,7 @@ describe("P5b Integration - drawingContext", () => {
     });
 });
 
-describe("P5b Integration - Environment (Extended)", () => {
+desc("P5b Integration - Environment (Extended)", () => {
     it("cursor() does not throw in headless environment", (done) => {
         const p5b = new P5b({
             width: 16, height: 16, fps: 30,
@@ -2319,17 +2327,18 @@ describe("P5b Integration - Environment (Extended)", () => {
     });
 
     it("pixelDensity() returns 1 in headless environment", (done) => {
+        let pd;
         const p5b = new P5b({
             width: 16, height: 16, fps: 30,
             setup: () => { createCanvas(16, 16); },
             draw: () => {
-                global._pd = pixelDensity();
+                pd = pixelDensity();
                 noLoop();
             }
         });
         p5b.on("error", (e) => { p5b.stop(); done(e.error); });
         p5b.on("frame", () => {
-            expect(global._pd).toBe(1);
+            expect(pd).toBe(1);
             p5b.stop();
             done();
         });
@@ -2337,19 +2346,20 @@ describe("P5b Integration - Environment (Extended)", () => {
     });
 
     it("windowWidth and windowHeight match dimensions passed to createCanvas()", (done) => {
+        let winW, winH;
         const p5b = new P5b({
             width: 200, height: 200, fps: 30,
             setup: () => { createCanvas(150, 120); },
             draw: () => {
-                global._ww = windowWidth;
-                global._wh = windowHeight;
+                winW = windowWidth;
+                winH = windowHeight;
                 noLoop();
             }
         });
         p5b.on("error", (e) => { p5b.stop(); done(e.error); });
         p5b.on("frame", () => {
-            expect(global._ww).toBe(150);
-            expect(global._wh).toBe(120);
+            expect(winW).toBe(150);
+            expect(winH).toBe(120);
             p5b.stop();
             done();
         });
@@ -2357,14 +2367,13 @@ describe("P5b Integration - Environment (Extended)", () => {
     });
 });
 
-describe("P5b Integration - Accessibility", () => {
+desc("P5b Integration - Accessibility", () => {
     it("describe() does not throw in headless environment", (done) => {
         const p5b = new P5b({
             width: 16, height: 16, fps: 30,
             setup: () => { createCanvas(16, 16); },
             draw: () => {
-                // Use global.describe explicitly to avoid shadowing by bun:test's describe
-                global.describe("A simple red square on a black background.");
+                describe("A simple red square on a black background.");
                 background(0); fill(255, 0, 0); rect(4, 4, 8, 8);
                 noLoop();
             }
@@ -2420,7 +2429,7 @@ describe("P5b Integration - Accessibility", () => {
     });
 });
 
-describe("P5b Integration - loadFont", () => {
+desc("P5b Integration - loadFont", () => {
     const fontPath = path.resolve(process.cwd(), "test/fixtures/font/SourceCodePro-Regular.ttf");
 
     it.skipIf(isP5v2)("loadFont() in preload returns a p5.Font object", (done) => {
@@ -2443,7 +2452,7 @@ describe("P5b Integration - loadFont", () => {
     });
 
     it.skipIf(isP5v2)("loadFont() allows textFont() to change rendering", (done) => {
-        let font;
+        let font, textW;
         const p5b = new P5b({
             width: 100, height: 100, fps: 30,
             preload: () => { font = loadFont(fontPath); },
@@ -2451,13 +2460,13 @@ describe("P5b Integration - loadFont", () => {
             draw: () => {
                 textFont(font);
                 textSize(20);
-                global._tw = textWidth("Hello");
+                textW = textWidth("Hello");
                 noLoop();
             }
         });
         p5b.on("error", (e) => { p5b.stop(); done(e.error); });
         p5b.on("frame", () => {
-            expect(global._tw).toBeGreaterThan(0);
+            expect(textW).toBeGreaterThan(0);
             p5b.stop();
             done();
         });
@@ -2480,7 +2489,7 @@ describe("P5b Integration - loadFont", () => {
     });
 });
 
-describe("P5b Integration - push/pop", () => {
+desc("P5b Integration - push/pop", () => {
     it("push() and pop() restore fill color", (done) => {
         const p5b = new P5b({
             width: 100, height: 100, fps: 60,
@@ -2508,6 +2517,7 @@ describe("P5b Integration - push/pop", () => {
     });
 
     it("push() and pop() restore stroke weight", (done) => {
+        let lineWidth;
         const p5b = new P5b({
             width: 100, height: 100, fps: 60,
             setup: () => { createCanvas(100, 100); },
@@ -2518,13 +2528,13 @@ describe("P5b Integration - push/pop", () => {
                 strokeWeight(20);
                 pop();
                 // After pop, strokeWeight should be back to 1
-                global._sw = drawingContext.lineWidth;
+                lineWidth = drawingContext.lineWidth;
                 noLoop();
             }
         });
         p5b.on("error", (e) => { p5b.stop(); done(e.error); });
         p5b.on("frame", () => {
-            expect(global._sw).toBe(1);
+            expect(lineWidth).toBe(1);
             p5b.stop();
             done();
         });
@@ -2563,7 +2573,7 @@ describe("P5b Integration - push/pop", () => {
     });
 });
 
-describe("P5b Integration - Transforms", () => {
+desc("P5b Integration - Transforms", () => {
     it("translate() shifts drawing origin", (done) => {
         const p5b = new P5b({
             width: 100, height: 100, fps: 60,
@@ -2681,7 +2691,7 @@ describe("P5b Integration - Transforms", () => {
     });
 });
 
-describe("P5b Integration - colorMode", () => {
+desc("P5b Integration - colorMode", () => {
     // p5 v2 HSB color rendering produces different canvas output due to colorjs.io.
     // v1: fill(0,100,100) in HSB → red; v2: same call → black (colorjs.io mapping differs).
     it.skipIf(isP5v2)("colorMode(HSB) allows HSB color specification", (done) => {
@@ -2801,7 +2811,7 @@ describe("P5b Integration - colorMode", () => {
     });
 });
 
-describe("P5b Integration - Property Getters", () => {
+desc("P5b Integration - Property Getters", () => {
     it("frameCount increments each draw call", (done) => {
         const counts = [];
         const p5b = new P5b({
@@ -2827,19 +2837,20 @@ describe("P5b Integration - Property Getters", () => {
     });
 
     it("width and height reflect the createCanvas dimensions", (done) => {
+        let w, h;
         const p5b = new P5b({
             width: 50, height: 50, fps: 30,
             setup: () => { createCanvas(80, 60); },
             draw: () => {
-                global._w = width;
-                global._h = height;
+                w = width;
+                h = height;
                 noLoop();
             }
         });
         p5b.on("error", (e) => { p5b.stop(); done(e.error); });
         p5b.on("frame", () => {
-            expect(global._w).toBe(80);
-            expect(global._h).toBe(60);
+            expect(w).toBe(80);
+            expect(h).toBe(60);
             p5b.stop();
             done();
         });
@@ -2847,17 +2858,18 @@ describe("P5b Integration - Property Getters", () => {
     });
 
     it("frameRate getter returns a number", (done) => {
+        let currentFps;
         const p5b = new P5b({
             width: 16, height: 16, fps: 30,
             setup: () => { createCanvas(16, 16); },
             draw: () => {
-                global._fr = frameRate();
+                currentFps = frameRate();
                 noLoop();
             }
         });
         p5b.on("error", (e) => { p5b.stop(); done(e.error); });
         p5b.on("frame", () => {
-            expect(typeof global._fr).toBe("number");
+            expect(typeof currentFps).toBe("number");
             p5b.stop();
             done();
         });
@@ -2865,7 +2877,7 @@ describe("P5b Integration - Property Getters", () => {
     });
 });
 
-describe("P5b Integration - navigator.userAgent", () => {
+desc("P5b Integration - navigator.userAgent", () => {
     it("userAgent contains p5b-dom and version string", (done) => {
         let capturedUA = null;
         const p5b = new P5b({
@@ -2886,7 +2898,7 @@ describe("P5b Integration - navigator.userAgent", () => {
     });
 });
 
-describe("P5b Integration - run/stop/run lifecycle", () => {
+desc("P5b Integration - run/stop/run lifecycle", () => {
     it("emits frames correctly after stop() and run() again", (done) => {
         let frameCount = 0;
         let timeoutRan = false;
@@ -2921,7 +2933,7 @@ describe("P5b Integration - run/stop/run lifecycle", () => {
     }, 10000);
 });
 
-describe("P5b Integration - toFrame loadPixels happy path", () => {
+desc("P5b Integration - toFrame loadPixels happy path", () => {
     it("emits correct RGBA pixels when canvas matches p5b dimensions", (done) => {
         const WIDTH = 16;
         const HEIGHT = 16;

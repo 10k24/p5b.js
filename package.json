@@ -33,8 +33,10 @@
         "test:v1": "P5B_P5_PATH=p5 bun test",
         "test:v2": "P5B_P5_PATH=p5-v2 bun test",
         "test:all": "bun run test:v1 && bun run test:v2",
+        "test:coverage": "P5B_P5_PATH=p5 bun test --coverage && P5B_P5_PATH=p5-v2 bun test --coverage",
         "test:watch": "bun test --watch",
         "lint": "bunx eslint",
+        "drift": "node scripts/compare-adapters.js",
         "fix": "bunx eslint --fix",
         "docs": "node scripts/build-readme.js"
     },
@@ -63,8 +65,10 @@
     },
     "dependencies": {
         "canvas": "^3.2.3",
-        "gl": "^8.1.6",
         "opentype.js": "^1.3.4"
+    },
+    "optionalDependencies": {
+        "gl": "^8.1.6"
     },
     "devDependencies": {
         "dot": "^1.1.3",

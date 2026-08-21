@@ -1,5 +1,6 @@
+var results = {};
+
 function setup() {
-    const results = global.results = {};
     results.pi = PI;
     results.two_pi = TWO_PI;
     results.half_pi = HALF_PI;

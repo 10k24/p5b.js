@@ -10,10 +10,10 @@ p5b supports p5 v1.11.x and p5 v2.2.x via two adapters — `p5b_v1.js` and `p5b_
 
 | API | v1 | v2 | p5b Impact | Status |
 |-----|----|----|-----------|--------|
-| `_incrementPreload()` / `_decrementPreload()` | Static methods on p5 | **Removed** | Critical — used in all 4 load* functions | Handled — v2 wrapper tracks `_pendingLoads` (`p5b_v2.js`) |
+| `_incrementPreload()` / `_decrementPreload()` | Static methods on p5 | **Removed** | Critical — used in all 4 load* functions | v2 uses native `async`/`await` instead |
 | Module format | CJS/UMD | ES Module | Requires updated require() logic | Handled — `require(pkg).default \|\| require(pkg)` |
 | Addon registration | `p5.prototype.x = fn` | `p5.registerAddon()` | No direct p5b impact | — |
-| File loading lifecycle | preload counter | native async/await | Requires conditional code path | Handled — p5b wraps user `preload()` inside an async setup shim; `_waitForPreloads()` blocks setup until loads settle |
+| File loading lifecycle | preload counter | native async/await | Requires conditional code path | v2 uses native `async`/`await` — `preload` is **v1-only** |
 
 ## Still Compatible in v2
 
@@ -26,7 +26,7 @@ p5b supports p5 v1.11.x and p5 v2.2.x via two adapters — `p5b_v1.js` and `p5b_
 Selection is a package-name convention, not version sniffing:
 
 ```js
-const { P5b, P5B_DEFAULTS } = p5pkg === "p5-v2"
+const { P5b, P5B_DEFAULTS } = p5pkg.startsWith("p5-v2")
     ? require("./p5b_v2")
     : require("./p5b_v1");
 ```
@@ -35,10 +35,10 @@ The previously planned `_detectP5Version()` helper was dropped by design: readin
 
 ## Preload / Asset Loading
 
-- **v2 wrapper** (`p5b_v2.js`): `_preloadIncrement()` / `_preloadDecrement()` maintain `_pendingLoads`; `_waitForPreloads()` polls until it drains (with a 10s timeout). The setup shim invokes the user `preload()` then awaits `_waitForPreloads()` before calling the user `setup()`.
+- **v2 wrapper** (`p5b_v2.js`): No preload tracking. v2 sketches use `await` in `async setup()` to load assets. `preload` is **v1-only**: `_validateConfig()` rejects any `preload` config (p5 v2 removed the lifecycle).
 - **v1 wrapper** (`p5b_v1.js`): uses p5 v1's native `_incrementPreload()` / `_decrementPreload()`.
 
-No runtime `this._p5Major` branching was needed — each adapter is version-specific.
+No runtime `this._p5Version` branching was needed — each adapter is version-specific.
 
 ## Dependency Management
 
@@ -66,15 +66,12 @@ Done:
 
 ## Remaining Work
 
-- **Align `p5b_v2.js` naming with `p5b_v1.js`** — reconcile variable names and convenience-variable assignments in `p5b_v2.js` to match `p5b_v1.js` so the two adapters stay structurally parallel and diffs between them stay small. Investigate a static-analysis approach (e.g. a diff/structural-comparison script) to keep drift in check. **Do not modify `p5b_v1.js`.**
-- p5b_v2.js: need async/await support in v2 API; only do this once all other work is addressed for v2
+None currently.
 
-### Addressed (2026-08-12)
+### Addressed (2026-08-19)
 
-- `colorMode(HSB)` — was: p5 v2 serializes HSB colors as CSS Color 4 percentage `rgb()` (e.g. `rgb(100% 0% 0%)`), which node-canvas's color parser rejects (silently defaulting to transparent black). Now: p5b normalizes percentage `rgb()/rgba()` to numeric form in the node-canvas `fillStyle`/`strokeStyle` setters, matching what p5 v2 expects the browser canvas to accept. HSB `fill`/`stroke`/`background` now render identically to v1.
-- `beginShape`/`endShape`/`vertex` — was: v2 renders custom shapes via `Path2D` (browser-only), which threw. Now: p5b polyfills `Path2D` and patches node-canvas's `CanvasRenderingContext2D` fill/stroke/clip to replay recorded path commands. Also unlocks `clip()`/`beginClip()`/`endClip()`. (The `Path2D` and color-normalization patches live in `p5b-dom.js`, installed only for p5 v2 via the `p5Major` option.)
-- `join()`/`split()`/`trim()` globals — was: removed in p5 v2. Now: shimmed to v1 semantics in `_bindGlobals`.
-- `loadTable()` + string column lookups — was: v2 `TableRow.get/getNum/getString` read `obj[columns.indexOf(column)]`, returning stale values after `set()`. Now: p5b patches `TableRow.prototype` to read `obj[column]` and seeds name-keyed entries in loaded rows.
+- **v2 `loadImage()` returns Promise** — `loadImage()` now returns a `Promise<p5.Image>` so `await loadImage()` works in async `setup()`. Legacy `onSuccess`/`onError` callbacks still fire. v1 loadImage unchanged (sync, preload-based).
+- **Full async/await support in v2** — Both `setup()` and `draw()` support `async` functions. The v2 adapter overrides `_initDrawWrapper()` to detect async draw and await it before emitting frames. Preload tracking (`_pendingLoads`, `_preloadIncrement`/`_preloadDecrement`, `_waitForPreloads`) removed — v2 sketches use `await` in `async setup()` instead.
 
 ---
 
@@ -83,7 +80,8 @@ Done:
 1. `bun run test:v1` — all tests pass against p5 v1
 2. `bun run test:v2` — all tests pass against p5 v2
 3. Manual: sketch using `loadImage` in `preload()` works under v1
-4. Manual: sketch using `async setup()` with `await loadImage()` works under v2
-5. `P5B_P5_PATH=p5-v2 bun test test/integration/sketches.test.js` passes
+4. Manual: `preload` config throws under v2 ("preload is not supported in p5.js v2")
+5. Manual: sketch using `async setup()` with `await loadImage()` works under v2
+6. `P5B_P5_PATH=p5-v2 bun test test/integration/sketches.test.js` passes
 
 All items currently pass.

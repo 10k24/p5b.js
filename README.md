@@ -91,9 +91,10 @@ Creates a new P5b instance with the given options.
 | `width` | number | 32 | Canvas width in pixels |
 | `height` | number | 32 | Canvas height in pixels |
 | `fps` | number | 60 | Target frame rate |
-| `preload` | function | noop | p5.js preload() function |
 | `setup` | function | noop | p5.js setup() function |
 | `draw` | function | noop | p5.js draw() function |
+| `maxPoolSize` | number | 4 | Max pooled createGraphics objects retained per width:height bucket (0 = no pooling) |
+| `preload` | function | noop | p5.js preload() function (v1 only — rejected in p5 v2) |
 
 ### Methods
 
@@ -250,7 +251,7 @@ By default p5b loads whichever `p5` package is installed. Set `P5B_P5_PATH` to u
 P5B_P5_PATH=p5-v2 node my-sketch.js
 ```
 
-**p5.js v2 async setup:** p5 v2 removed the `preload()` lifecycle. p5b wraps your `preload()` inside an `async setup()` automatically, so existing v1 sketches work unchanged. For new v2-style sketches, use `async setup()` directly:
+**p5.js v2 async setup:** p5 v2 removed the `preload()` lifecycle. p5b **rejects** a `preload` config under v2 (the `preload` option is v1-only) — for v2 sketches, use `async setup()` directly:
 
 ```javascript
 async function setup() {

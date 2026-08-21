@@ -1,16 +1,13 @@
-const canvas = require("canvas");
 const fs = require("fs");
-const opentype = require("opentype.js");
-const { P5bBase, P5B_DEFAULTS, reorderBuffer } = require("./p5b-base");
-
-const noop = () => {};
+const { P5bBase, P5B_DEFAULTS, fetchJSON, reorderBuffer, resolveAssetPath, resolveAssetUrl, splitLines } = require("./p5b-base");
+const { noop } = require("./globals");
 
 class P5b extends P5bBase {
     constructor(config = {}) {
         // v1 owns the preload default: p5 v1 supports preload() as a lifecycle hook,
         // and the binding in _bindGlobals() reads this.preload. Inject a noop default
         // here instead of mutating the shared P5B_DEFAULTS (which p5b_v2.js also exports).
-        super({ ...config, preload: config.preload ?? noop, p5Major: 1 });
+        super({ ...config, preload: config.preload ?? noop, p5Version: 1 });
     }
 
     toFrame() {
@@ -19,33 +16,11 @@ class P5b extends P5bBase {
             throw new Error("Canvas not initialized. Call run() first.");
         }
 
-        // Happy path: canvas dimensions match p5b config — skip drawImage blit.
-        // node-canvas getImageData() (used by loadPixels) already returns RGBA, no swap needed.
         if (srcCanvas.width === this.width && srcCanvas.height === this.height) {
-            this._myP5.loadPixels();
-            return new Uint8Array(this._myP5.pixels.buffer);
+            return this._pixels();
         }
 
-        // Canvas resizing only happens if sketch code manually resizes,
-        // the performance and memory impact here should be negligible if not zero.
-        if (!this._destCanvas || this._destCanvas.width !== this.width || this._destCanvas.height !== this.height) {
-            this._destCanvas = canvas.createCanvas(this.width, this.height);
-        }
-
-        const ctx = this._destCanvas.getContext("2d");
-
-        // Fit to destination, do not stretch
-        const xRatio = this.width / srcCanvas.width;
-        const yRatio = this.height / srcCanvas.height;
-        const scaleFactor = Math.min(xRatio, yRatio);
-
-        ctx.drawImage(
-            srcCanvas,
-            0, 0, srcCanvas.width, srcCanvas.height,
-            0, 0, srcCanvas.width * scaleFactor, srcCanvas.height * scaleFactor
-        );
-
-        return reorderBuffer(this._destCanvas.toBuffer("raw"));
+        return reorderBuffer(this._letterbox(srcCanvas, srcCanvas.width, srcCanvas.height).toBuffer("raw"));
     }
 
     _initSketch() {
@@ -82,12 +57,6 @@ class P5b extends P5bBase {
         this._initDrawWrapper();
     }
 
-    _propertySetter(key, val) {
-        if (this._myP5) {
-            this._myP5[key] = val;
-        }
-    }
-
     _bindGlobals() {
         super._bindGlobals();
 
@@ -99,228 +68,153 @@ class P5b extends P5bBase {
             global.preload = this.preload;
         }
 
-        global.loadFont = (function(that) {
-            return function(fontPath) {
-                const resolvedPath = global._resolveAssetPath(that.sketchPath, fontPath);
-                let fontData;
-                try {
-                    fontData = fs.readFileSync(resolvedPath);
-                } catch (error) {
-                    if (error.code === "ENOENT") {
-                        throw new Error(`Failed to load font: file not found at ${resolvedPath}`);
-                    }
-                    throw new Error(`Failed to load font: ${error.message}`);
-                }
-                const parsedFont = opentype.parse(
-                    fontData.buffer.slice(fontData.byteOffset, fontData.byteOffset + fontData.byteLength)
-                );
-                const p5Font = new (that._loadP5()).Font(that._myP5);
-                p5Font.font = parsedFont;
-                return p5Font;
-            };
-        })(this);
+        global.loadFont = (fontPath) => {
+            const resolvedPath = resolveAssetPath(this.sketchPath, fontPath);
+            const { parsedFont } = this._readFont(resolvedPath);
+            const p5Font = new (this._loadP5()).Font(this._myP5);
+            p5Font.font = parsedFont;
+            return p5Font;
+        };
 
         // loadImage: mirrors p5.js's original loadImage contract exactly.
         // Returns a p5.Image shell synchronously (so img = loadImage(path) works
         // in preload and img.width/height are usable in setup/draw after the
         // preload counter clears). The shell is backed by a node-canvas Canvas,
         // so p5.js's image() function can draw it via img.canvas/.drawingContext.
-        // p5 v1 rebinds preload methods (loadImage, loadJSON, etc.) to global just before
-        // calling this.preload(), overwriting our custom implementations. Use defineProperty
-        // with a no-op setter so those rebind assignments are silently ignored.
-        const _p5bLoadImage = (function(that) {
-            return function(filePath, onSuccess, onError) {
-                const p5 = that._myP5;
-                if (!p5) {
-                    throw new Error("P5 instance is broken, did you call p5b.stop()?");
-                }
+        global.loadImage = (filePath, onSuccess, onError) => {
+            const p5 = this._myP5;
+            if (!p5) {
+                throw new Error("P5 instance is broken, did you call p5b.stop()?");
+            }
 
-                p5._incrementPreload();
+            const done = this._preloadHandle();
+            const url = resolveAssetUrl(this.sketchPath, filePath);
+            let pImg;
 
-                const resolvedPath = global._resolveAssetPath(that.sketchPath, filePath);
-                const url = filePath.startsWith("http") ? filePath : `file://${resolvedPath}`;
-                let pImg;
-
-                const loadImageData = (imageData) => {
-                    const rawImg = new canvas.Image();
-                    rawImg.onload = () => {
-                        pImg = new (that._loadP5()).Image(rawImg.width, rawImg.height);
-                        pImg.drawingContext.drawImage(rawImg, 0, 0);
-                        // Ignoring for now, only needed for webGL to refresh textures
-                        // pImg.modified = true;
-                        if (onSuccess) onSuccess(pImg);
-                        setImmediate(() => p5._decrementPreload());
-                    };
-                    rawImg.onerror = (err) => handleError(err instanceof Error ? err : new Error(String(err)));
-                    rawImg.src = Buffer.from(imageData);
-                };
-
-                const handleError = (error) => {
-                    setImmediate(() => p5._decrementPreload());
-                    if (onError) onError(error);
-                    else console.error(`Failed to load image: ${error.message}`);
-                };
-
-                if (url.startsWith("file://")) {
-                    try {
-                        const buf = fs.readFileSync(resolvedPath);
-                        loadImageData(buf.buffer.slice(buf.byteOffset, buf.byteOffset + buf.byteLength));
-                    } catch (error) {
-                        handleError(error);
-                    }
-                } else {
-                    global.fetch(url)
-                        .then(response => {
-                            if (!response.ok) throw new Error(`Failed to load image: ${response.status} ${response.statusText}`);
-                            return response.arrayBuffer();
-                        })
-                        .then(buf => loadImageData(buf))
-                        .catch(handleError);
-                }
-
-                return pImg;
+            const img = new global.Image();
+            img.onload = () => {
+                pImg = this._imageFromCanvas(img);
+                if (onSuccess) onSuccess(pImg);
+                done();
             };
-        })(this);
-        global.loadImage = _p5bLoadImage;
+            img.onerror = (err) => {
+                done();
+                if (onError) onError(err);
+                else console.error(`Failed to load image: ${err.message}`);
+            };
+            img.src = url;
+
+            return pImg;
+        };
 
         // Pool-based createGraphics: reuse Graphics objects across frames instead of
         // allocating new Cairo surfaces every draw call. On first use a new object is
         // created normally; on subsequent uses the pooled object is returned directly,
         // avoiding any allocation at all.
-        global.createGraphics = (function(that, cg) {
-            return function(w, h, ...rest) {
-                const key = `${w}:${h}`;
-                const pg = that._gfxAcquire(key);
-                if (pg) return pg;
-                
-                const ret = cg(w, h, ...rest);
-                ret.remove = function() {
-                    if (this.elt && this.elt.parentNode) {
-                        this.elt.parentNode.removeChild(this.elt);
-                    }
-                };
-                return ret;
-            };
-        })(this, global.createGraphics);
+        const _origCreateGraphics = global.createGraphics;
+        global.createGraphics = (w, h, ...rest) => {
+            const key = `${w}:${h}`;
+            const pg = this._gfxAcquire(key);
+            if (pg) return pg;
 
-        global.loadJSON = (function(that) {
-            return async function(filePath) {
-                const p5 = that._myP5;
-                p5._incrementPreload();
-                try {
-                    const resolvedPath = global._resolveAssetPath(that.sketchPath, filePath);
-                    const url = filePath.startsWith("http") ? filePath : `file://${resolvedPath}`;
-                    const response = await global.fetch(url);
-                    if (!response.ok) {
-                        throw new Error(`Failed to load JSON: ${response.status} ${response.statusText}`);
-                    }
-                    return await response.json();
-                } finally {
-                    setImmediate(() => p5._decrementPreload());
+            const ret = _origCreateGraphics(w, h, ...rest);
+            ret.remove = () => this._removeGraphics(ret, key);
+            return ret;
+        };
+
+        // p5 v1 semantics: returns a data object synchronously, populated once loaded;
+        // the preload counter blocks setup until it settles. Errors go to errorCallback
+        // (or console) — not a rejected promise.
+        global.loadJSON = (filePath, callback, errorCallback) => {
+            const done = this._preloadHandle();
+            const data = {};
+            fetchJSON(resolveAssetUrl(this.sketchPath, filePath))
+                .then((result) => { Object.assign(data, result); if (callback) callback(result); })
+                .catch((error) => { if (errorCallback) errorCallback(error); else console.error(`Failed to load JSON: ${error.message}`); })
+                .then(done);
+            return data;
+        };
+
+        const _origCreateCanvas = global.createCanvas;
+        global.createCanvas = (w, h, renderer) => {
+            const r = renderer === undefined ? "" : String(renderer);
+            if (r.toLowerCase() === "webgl") {
+                throw new Error("WEBGL mode is not supported in p5b. Use P2D or omit the renderer.");
+            }
+            const result = _origCreateCanvas(w, h, renderer);
+            this._syncCanvasGlobals(w, h);
+            return result;
+        };
+
+        global.loadStrings = (filePath, callback, errorCallback) => {
+            const done = this._preloadHandle();
+            try {
+                const lines = this._readTextLines(resolveAssetPath(this.sketchPath, filePath));
+                if (callback) callback(lines);
+                done();
+                return lines;
+            } catch (error) {
+                done();
+                if (errorCallback) errorCallback(error);
+                else console.error(`Failed to load strings: ${error.message}`);
+            }
+        };
+
+        global.loadTable = (filePath, ...args) => {
+            const done = this._preloadHandle();
+
+            // Parse variadic args: loadTable(path, [options], [header], callback, errorCallback)
+            let options = "";
+            let hasHeader = false;
+            let callback = null;
+            let errorCallback = null;
+            for (const arg of args) {
+                if (typeof arg === "function") {
+                    if (!callback) callback = arg;
+                    else errorCallback = arg;
+                } else if (typeof arg === "string") {
+                    if (arg === "header") hasHeader = true;
+                    else options = arg; // "csv", "tsv", "ssv"
                 }
-            };
-        })(this);
+            }
 
-        global.createCanvas = (function(that, cc) {
-            return function(w, h, renderer) {
-                const r = renderer === undefined ? "" : String(renderer);
-                if (r.toLowerCase() === "webgl") {
-                    throw new Error("WEBGL mode is not supported in p5b. Use P2D or omit the renderer.");
-                }
-                const result = cc(w, h, renderer);
-                that._myP5.windowWidth = w;
-                that._myP5.windowHeight = h;
-                global.drawingContext = that._myP5.drawingContext;
-                return result;
-            };
-        })(this, global.createCanvas);
+            let separator = ",";
+            if (options === "tsv") separator = "\t";
+            else if (options === "ssv") separator = ";";
 
-        global.loadStrings = (function(that) {
-            return function(filePath, callback, errorCallback) {
-                const p5 = that._myP5;
-                p5._incrementPreload();
-                try {
-                    const resolvedPath = global._resolveAssetPath(that.sketchPath, filePath);
-                    const content = fs.readFileSync(resolvedPath, "utf8");
-                    const lines = content
-                        .replace(/\r\n/g, "\r")
-                        .replace(/\n/g, "\r")
-                        .split(/\r/);
-                    if (lines.length > 0 && lines[lines.length - 1] === "") lines.pop();
-                    if (callback) callback(lines);
-                    setImmediate(() => p5._decrementPreload());
-                    return lines;
-                } catch (error) {
-                    setImmediate(() => p5._decrementPreload());
-                    if (errorCallback) errorCallback(error);
-                    else console.error(`Failed to load strings: ${error.message}`);
-                }
-            };
-        })(this);
+            try {
+                const resolvedPath = resolveAssetPath(this.sketchPath, filePath);
+                const lines = splitLines(fs.readFileSync(resolvedPath, "utf8")).filter(l => l.length > 0);
 
-        global.loadTable = (function(that) {
-            return function(filePath, ...args) {
-                const p5 = that._myP5;
-                p5._incrementPreload();
+                const P5 = this._loadP5();
+                const table = new P5.Table();
 
-                // Parse variadic args: loadTable(path, [options], [header], callback, errorCallback)
-                let options = "";
-                let hasHeader = false;
-                let callback = null;
-                let errorCallback = null;
-                for (const arg of args) {
-                    if (typeof arg === "function") {
-                        if (!callback) callback = arg;
-                        else errorCallback = arg;
-                    } else if (typeof arg === "string") {
-                        if (arg === "header") hasHeader = true;
-                        else options = arg; // "csv", "tsv", "ssv"
-                    }
+                let startRow = 0;
+                if (hasHeader && lines.length > 0) {
+                    const headers = lines[0].split(separator);
+                    headers.forEach(h => table.addColumn(h.trim()));
+                    startRow = 1;
                 }
 
-                let separator = ",";
-                if (options === "tsv") separator = "\t";
-                else if (options === "ssv") separator = ";";
-
-                try {
-                    const resolvedPath = global._resolveAssetPath(that.sketchPath, filePath);
-                    const content = fs.readFileSync(resolvedPath, "utf8");
-                    const lines = content
-                        .replace(/\r\n/g, "\r")
-                        .replace(/\n/g, "\r")
-                        .split(/\r/)
-                        .filter(l => l.length > 0);
-
-                    const P5 = that._loadP5();
-                    const table = new P5.Table();
-
-                    let startRow = 0;
-                    if (hasHeader && lines.length > 0) {
-                        const headers = lines[0].split(separator);
-                        headers.forEach(h => table.addColumn(h.trim()));
-                        startRow = 1;
+                for (let i = startRow; i < lines.length; i++) {
+                    const cells = lines[i].split(separator);
+                    // Auto-add columns on first data row when no header was provided
+                    if (table.columns.length === 0) {
+                        cells.forEach((_, j) => table.addColumn(String(j)));
                     }
-
-                    for (let i = startRow; i < lines.length; i++) {
-                        const cells = lines[i].split(separator);
-                        // Auto-add columns on first data row when no header was provided
-                        if (table.columns.length === 0) {
-                            cells.forEach((_, j) => table.addColumn(String(j)));
-                        }
-                        const row = table.addRow();
-                        cells.forEach((cell, j) => row.set(j, cell.trim()));
-                    }
-
-                    if (callback) callback(table);
-                    setImmediate(() => p5._decrementPreload());
-                    return table;
-                } catch (error) {
-                    setImmediate(() => p5._decrementPreload());
-                    if (errorCallback) errorCallback(error);
-                    else console.error(`Failed to load table: ${error.message}`);
+                    const row = table.addRow();
+                    cells.forEach((cell, j) => row.set(j, cell.trim()));
                 }
-            };
-        })(this);
+
+                if (callback) callback(table);
+                done();
+                return table;
+            } catch (error) {
+                done();
+                if (errorCallback) errorCallback(error);
+                else console.error(`Failed to load table: ${error.message}`);
+            }
+        };
     }
 
     _validateConfig() {

@@ -1,13 +1,15 @@
 const canvas = require("canvas");
 const { version } = require("./package.json");
+const fs = require("fs");
+const { noop } = require("./globals");
 
-const noop = () => {};
 const spliceFrom = (arr, item) => {
     const idx = arr.indexOf(item);
     idx > -1 && arr.splice(idx, 1);
 };
+const makeClassList = () => ({ add: noop, remove: noop, contains: () => false, toggle: noop });
 
-// Node-canvas compatibility patches, installed only for p5 v2 (options.p5Major === 2).
+// Node-canvas compatibility patches, installed only for p5 v2 (options.p5Version === 2).
 // p5 v1 never needs them (and must not get them: percentage-color normalization would
 // add CSS Color 4 support v1 does not have).
 
@@ -90,6 +92,59 @@ function installPath2D() {
     };
 }
 
+// Functional Image backed by node-canvas. Supports src setter, onload/onerror,
+// and drawImage() (extends canvas.Image so node-canvas recognizes it natively).
+// Satisfies p5.js v1's loadImage() which creates a native Image, sets src,
+// and reads width/height on load.
+class P5bImage extends canvas.Image {
+    constructor() {
+        super();
+        this._onload = null;
+        this._onerror = null;
+        this.crossOrigin = "";
+    }
+
+    get onload() { return this._onload; }
+    set onload(fn) { this._onload = fn; }
+    get onerror() { return this._onerror; }
+    set onerror(fn) { this._onerror = fn; }
+
+    set src(url) {
+        if (!url) return;
+        this._load(url);
+    }
+
+    _load(url) {
+        const setData = (data) => {
+            super.src = data;
+            if (this._onload) this._onload();
+        };
+        const onError = (e) => {
+            if (this._onerror) this._onerror(e);
+            else console.error(`Failed to load image: ${e.message}`);
+        };
+
+        try {
+            if (url.startsWith("data:")) {
+                const base64 = url.split(",")[1];
+                setData(Buffer.from(base64, "base64"));
+            } else if (url.startsWith("file://")) {
+                setData(fs.readFileSync(url.replace(/^file:\/\//, "")));
+            } else {
+                global.fetch(url)
+                    .then((response) => {
+                        if (!response.ok) throw new Error(`Failed to load image: ${response.status}`);
+                        return response.arrayBuffer();
+                    })
+                    .then((buf) => setData(Buffer.from(buf)))
+                    .catch(onError);
+            }
+        } catch (e) {
+            onError(e);
+        }
+    }
+}
+
 class P5bDOM {
     constructor(width, height, options = {}) {
         this.width = width;
@@ -97,7 +152,7 @@ class P5bDOM {
         this._bodyChildren = [];
         this._canvases = [];
         
-        if (options.p5Major === 2) {
+        if (options.p5Version === 2) {
             installPath2D();
             installColorCompat();
         }
@@ -141,7 +196,7 @@ class P5bDOM {
                 id: "",
                 style: {},
                 dataset: {},
-                classList: { add: noop, remove: noop, contains: () => false, toggle: noop },
+                classList: makeClassList(),
                 addEventListener: noop,
                 removeEventListener: noop,
                 dispatchEvent: () => true,
@@ -164,7 +219,7 @@ class P5bDOM {
 
         const makeCanvas = () => {
             const c = canvas.createCanvas(1, 1);
-            c.classList = { add: noop, remove: noop, contains: () => false, toggle: noop };
+            c.classList = makeClassList();
             c.dataset = {};
             c.setAttribute = noop;
             c.getAttribute = () => null;
@@ -191,8 +246,12 @@ class P5bDOM {
                 if (type === "webgl2") return null;
                 if (type === "webgl" || type === "webgl-strict") {
                     if (!c._glCtx) {
-                        const gl = require("gl");
-                        c._glCtx = gl(c.width, c.height, { preserveDrawingBuffer: true });
+                        try {
+                            const gl = require("gl");
+                            c._glCtx = gl(c.width, c.height, { preserveDrawingBuffer: true });
+                        } catch (_) {
+                            return null;
+                        }
                     }
                     return c._glCtx;
                 }
@@ -203,33 +262,24 @@ class P5bDOM {
             // canvas (e.g. after createCanvas(w, h, WEBGL)), the headless-gl
             // drawingbuffer is resized to match via the STACKGL extension.
             let _w = c.width, _h = c.height;
-            Object.defineProperty(c, "width", {
-                get: () => _w,
+            const _syncStackGL = () => {
+                if (c._glCtx) {
+                    const ext = c._glCtx.getExtension("STACKGL_resize_drawingbuffer");
+                    if (ext) ext.resize(_w, _h);
+                }
+            };
+            const _setSize = (dim) => ({
+                get: () => dim === "width" ? _w : _h,
                 set: (v) => {
-                    _w = v;
-                    // Resize underlying node-canvas buffer too
-                    const desc = Object.getOwnPropertyDescriptor(Object.getPrototypeOf(c), "width");
+                    if (dim === "width") _w = v; else _h = v;
+                    const desc = Object.getOwnPropertyDescriptor(Object.getPrototypeOf(c), dim);
                     if (desc && desc.set) desc.set.call(c, v);
-                    if (c._glCtx) {
-                        const ext = c._glCtx.getExtension("STACKGL_resize_drawingbuffer");
-                        if (ext) ext.resize(_w, _h);
-                    }
+                    _syncStackGL();
                 },
                 configurable: true,
             });
-            Object.defineProperty(c, "height", {
-                get: () => _h,
-                set: (v) => {
-                    _h = v;
-                    const desc = Object.getOwnPropertyDescriptor(Object.getPrototypeOf(c), "height");
-                    if (desc && desc.set) desc.set.call(c, v);
-                    if (c._glCtx) {
-                        const ext = c._glCtx.getExtension("STACKGL_resize_drawingbuffer");
-                        if (ext) ext.resize(_w, _h);
-                    }
-                },
-                configurable: true,
-            });
+            Object.defineProperty(c, "width", _setSize("width"));
+            Object.defineProperty(c, "height", _setSize("height"));
 
             allCanvases.push(c);
             return c;
@@ -251,7 +301,7 @@ class P5bDOM {
                 },
                 insertBefore: (el, _ref) => { bodyChildren.push(el); if (el && typeof el === "object") { el.parentNode = document.body; el.parentElement = document.body; } return el; },
                 style: {},
-                classList: { add: noop, remove: noop, contains: () => false, toggle: noop },
+                classList: makeClassList(),
                 clientWidth: this.width,
                 clientHeight: this.height,
                 addEventListener: noop,
@@ -274,7 +324,7 @@ class P5bDOM {
                 if (t === "head") return [document.head];
                 return bodyChildren.filter((el) => el.tagName && el.tagName.toLowerCase() === t);
             },
-            documentElement: { style: {}, classList: { add: noop, remove: noop, contains: () => false }, clientWidth: this.width, clientHeight: this.height },
+            documentElement: { style: {}, classList: makeClassList(), clientWidth: this.width, clientHeight: this.height },
             scripts: [],
             fonts: { add: noop, ready: Promise.resolve(), values: () => [][Symbol.iterator]() },
             readyState: "complete",
@@ -306,9 +356,25 @@ class P5bDOM {
             Event: class Event { constructor(type) { this.type = type; this.bubbles = false; this.cancelable = false; } },
             MouseEvent: class MouseEvent { constructor(type) { this.type = type; } },
             HTMLCanvasElement: canvas.Canvas,
+            Image: P5bImage,
             ImageData: canvas.ImageData,
             performance: { now: () => Date.now() },
-            fetch: global.fetch,
+            fetch: (url, init) => {
+                const target = (url instanceof global.Request) ? url.url : url;
+                if (typeof target === "string" && target.startsWith("file://")) {
+                    const filePath = target.replace(/^file:\/\//, "");
+                    return fs.promises.readFile(filePath).then((data) => ({
+                        ok: true,
+                        status: 200,
+                        url: target,
+                        headers: new Map([["content-type", "application/octet-stream"]]),
+                        arrayBuffer: () => Promise.resolve(data.buffer.slice(data.byteOffset, data.byteOffset + data.byteLength)),
+                        text: () => Promise.resolve(data.toString("utf8")),
+                        json: () => Promise.resolve(JSON.parse(data.toString("utf8"))),
+                    }));
+                }
+                return global.fetch(url, init);
+            },
         };
 
         // Wrap win in a Proxy so p5.js strands can temporarily inject shader
@@ -341,6 +407,7 @@ class P5bDOM {
             });
         }
         global.HTMLCanvasElement = canvas.Canvas;
+        global.Image = P5bImage;
         global.ImageData = canvas.ImageData;
         global.requestAnimationFrame = (cb) => setImmediate(cb);
         global.cancelAnimationFrame = (id) => clearImmediate(id);
@@ -349,7 +416,6 @@ class P5bDOM {
         // Stub browser font-loading API used by p5 v2's Font constructor
         global.FontFace = class FontFace { constructor(family) { this.family = family; } };
         // Stub XMLHttpRequest for font loading in headless environment
-        const fs = require("fs");
         global.XMLHttpRequest = class XMLHttpRequest {
             constructor() {
                 this.readyState = 0;

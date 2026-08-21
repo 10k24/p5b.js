@@ -28,7 +28,8 @@ const descriptions = {
     preload: "p5.js preload() function",
     setup: "p5.js setup() function",
     draw: "p5.js draw() function",
-    sketchPath: "Path to sketch file, omit preload, setup, & draw parameters if using"
+    sketchPath: "Path to sketch file, omit preload, setup, & draw parameters if using",
+    maxPoolSize: "Max pooled createGraphics objects retained per width:height bucket (0 = no pooling)"
 };
 
 // Load stub files
@@ -66,11 +67,22 @@ const defaults = Object.entries(P5B_DEFAULTS).map(([key, value]) => {
     };
 });
 
+// preload is a v1-only option — p5 v2 removed the preload() lifecycle and p5b rejects a
+// preload config under v2. It's not part of the shared P5B_DEFAULTS (v1 injects its own
+// noop default in the constructor), so document it as a v1-only config row below.
+const v1OnlyDefaults = ["preload"];
 for (const key of Object.keys(descriptions)) {
-    if (!Object.prototype.hasOwnProperty.call(P5B_DEFAULTS, key)) {
+    if (!Object.prototype.hasOwnProperty.call(P5B_DEFAULTS, key) && !v1OnlyDefaults.includes(key)) {
         throw new Error(`Extra description with no matching default: ${key}`);
     }
 }
+
+defaults.push({
+    key: "preload",
+    type: "function",
+    default: "noop",
+    description: "p5.js preload() function (v1 only — rejected in p5 v2)"
+});
 
 // Create a map of defaults by key for easy access in template
 const defaultsByKey = {};

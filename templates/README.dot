@@ -203,7 +203,7 @@ By default p5b loads whichever `p5` package is installed. Set `P5B_P5_PATH` to u
 P5B_P5_PATH=p5-v2 node my-sketch.js
 ```
 
-**p5.js v2 async setup:** p5 v2 removed the `preload()` lifecycle. p5b wraps your `preload()` inside an `async setup()` automatically, so existing v1 sketches work unchanged. For new v2-style sketches, use `async setup()` directly:
+**p5.js v2 async setup:** p5 v2 removed the `preload()` lifecycle. p5b **rejects** a `preload` config under v2 (the `preload` option is v1-only) — for v2 sketches, use `async setup()` directly:
 
 ```javascript
 async function setup() {

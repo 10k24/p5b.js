@@ -4,42 +4,7 @@
 
 These are the top priorities for the next release.
 
-### 1. Graphics Pool State on Reuse
-
-Pooled graphics retain previous state (draw settings, transformations, pixel data) between frames.
-
-**Location:** `createGraphics` pool checkout — `p5b_v1.js` (~line 338), `p5b_v2.js` (~line 458)
-
-**Fix:** Reset graphics state (transform, fill, stroke, etc.) when pulling from pool.
-
-### 2. Graphics Pool Unbounded Growth
-
-If a sketch creates graphics of many different sizes, the pool map grows indefinitely.
-
-**Location:** pool management in `_initSketch` — `p5b_v1.js` (~line 179), `p5b_v2.js` (~line 297)
-
-**Fix:** Cap bucket size per key, or add LRU eviction across the pool map.
-
-### 3. `global:` Config Option
-
-Shared sketch-scope variables across `preload`/`setup`/`draw` when using inline config functions (no `sketchPath`).
-
-**Root cause:** When config supplies `{preload, setup, draw}` as functions, p5b assigns each to `global.*`. These functions are defined in the caller's closure — a `let x` inside `preload` is invisible to `setup`. Users must write `global.x = ...` explicitly to share state across lifecycle functions.
-
-By contrast, `sketchPath` sketches run via `vm.runInThisContext`, so top-level variables in the sketch file are shared naturally.
-
-**Fix:** Add a `global:` function to config that runs before `preload` and declares shared variables into global scope:
-
-```js
-new P5b({
-  global: () => { myImage = null; },
-  preload: () => { myImage = loadImage('img.png'); },
-  setup: () => { image(myImage, 0, 0); },
-  draw: () => {},
-});
-```
-
-### 4. Global Alpha Override
+### 1. Global Alpha Override
 
 Add an `alpha` property to P5b config (integer in [0, 255]) to apply a constant opacity to every emitted frame.
 
@@ -50,6 +15,8 @@ Add an `alpha` property to P5b config (integer in [0, 255]) to apply a constant 
 ## Released
 
 - `loadImage()` canvas v3 fixes (async decode wait + ArrayBuffer slice) shipped in [1.2.2](CHANGELOG.md).
+- v1 `loadJSON()` now matches real p5 v1 semantics: returns a data object synchronously, supports `loadJSON(path, callback, errorCallback)`, errors go to `errorCallback` (not a rejected promise). Resolves the former "loadJSON Callback Compatibility" API gap (v1).
+- v2 fidelity + dedup cleanup: removed v1-normalizing `join()`/`split()`/`trim()` shims and the `loadTable()` TableRow patch so p5b v2 matches real p5 v2 browser behavior (incl. upstream quirks); extracted shared helpers to `p5b-base.js` (`_fetchJson`, `_readTextLines`, `_wrapSetup`, `_syncCanvasGlobals`, `_preloadHandle`, `_readFont`, `_removeGraphics`, `_pixels`, `_letterbox`) and centralized `resolveAssetPath`/`resolveAssetUrl`/`splitLines`; `noop` moved to `globals.js`. This resolves the former "Asset Path/URL Duplication", "Preload Counter Duplication", and "`fetch` Bound at Init Time" backlog items.
 
 ---
 
@@ -59,25 +26,13 @@ Lower priority issues identified during code review. Not scoped to any specific 
 
 ### Code Quality
 
-#### Asset Path / URL Duplication
-Path resolution is now centralized in `global._resolveAssetPath()` (both wrappers). Remaining duplication: the `file://` URL construction and `filePath.startsWith("http")` branch are still repeated per load function (`loadImage`, `loadJSON`, `loadStrings`, `loadTable`). Extract to a shared helper.
-
-#### Preload Counter Duplication
-v2 uses `_preloadIncrement()` / `_preloadDecrement()` helpers (`p5b_v2.js`). v1 still inlines `p5._incrementPreload()` / `setImmediate(p5._decrementPreload())` in `loadImage`, `loadStrings`, `loadTable`. Extract to a helper in v1 too.
-
-#### `fetch` Bound at Init Time
-`p5b-dom.js` sets `fetch: global.fetch` at construction time (p5b-dom.js:222). If `fetch` isn't available yet (Node < 18 without polyfill), it's permanently `undefined`. Should be a getter: `get fetch() { return global.fetch; }`.
+#### `async preload()` Semantics
+If a sketch uses `async function preload() { await loadJSON(...) }`, p5.js never awaits the returned promise. p5b mitigates this: v1 load functions use `_preloadHandle()` to increment/decrement p5's own preload counter, so p5's lifecycle blocks until p5b-managed loads settle. Native p5 (WebGL/`loadFont` in v1) loads inside an async preload are not tracked. Should detect and warn. **v1-only** — v2 rejects `preload` configs entirely.
 
 #### `loadFont()` vs `loadJSON()` Inconsistency
 `loadFont()` is synchronous (blocking file I/O). `loadJSON()` is async. Surprising difference for users familiar with p5.js where both use the same callback/preload pattern. Accepted as a known design tradeoff.
 
-#### `async preload()` Semantics
-If a sketch uses `async function preload() { await loadJSON(...) }`, p5.js never awaits the returned promise. p5b mitigates this: its own load functions track `_pendingLoads` and `_waitForPreloads()` blocks setup until they settle — but only for p5b-managed loads. Native p5 (WebGL/`loadFont` in v1) loads inside an async preload are not tracked. Should detect and warn.
-
 ### API Gaps
-
-#### `loadJSON()` Callback Compatibility
-p5.js `loadJSON()` supports `loadJSON(path, successCallback, errorCallback)`. p5b's implementation is async-only. Sketches using the callback pattern will silently get no data.
 
 #### `loadStrings()` HTTP Support
 `loadStrings()` supports local files only. `loadImage()` and `loadJSON()` both support HTTP URLs. Inconsistent.
@@ -118,5 +73,5 @@ These require browser APIs unavailable in Node.js.
 
 Status differs by adapter:
 
-- **v1** (`p5b_v1.js`): `createCanvas(w, h, WEBGL)` throws by design (p5b_v1.js:561).
+- **v1** (`p5b_v1.js`): `createCanvas(w, h, WEBGL)` throws by design.
 - **v2** (`p5b_v2.js`): WebGL 1 works headlessly via `headless-gl` (context interception in `p5b-dom.js`; `isP3D` read path in `toFrame()`). WebGL 2 is not supported (headless-gl is WebGL 1 only). Known caveat: shader sketches can leak memory — see `MEMLEAK.md`.
