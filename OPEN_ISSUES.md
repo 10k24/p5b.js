@@ -1,62 +1,102 @@
 # Open Issues - p5b.js
 
-## Next Up (v1.3.0)
+## Priority 1 — API Gaps & Semantics
 
-These are the top priorities for the next release.
+### async preload() Semantics (v1)
+If a sketch uses `async function preload() { await loadJSON(...) }`, p5.js never awaits
+the returned promise. p5b mitigates this: v1 load functions use `_preloadHandle()` to
+increment/decrement p5's own preload counter, so p5's lifecycle blocks until p5b-managed
+loads settle. Native p5 (WebGL/`loadFont` in v1) loads inside an async preload are not
+tracked. Should detect and warn. **v1-only** — v2 rejects `preload` configs entirely.
 
-### 1. Global Alpha Override
+### loadStrings() HTTP Support
+`loadStrings()` supports local files only. `loadImage()` and `loadJSON()` both support
+HTTP URLs. Inconsistent.
 
-Add an `alpha` property to P5b config (integer in [0, 255]) to apply a constant opacity to every emitted frame.
+### loadBytes() Missing
+`loadBytes()` is not implemented. Calls throw `"loadBytes is not defined"` with no helpful error.
 
-**Fix:** Scale the alpha channel of the RGBA frame buffer by `alpha / 255` in `toFrame()`.
+### loadXML() Missing
+`loadXML()` is not implemented. Calls throw `"loadXML is not defined"` with no helpful error.
+
+### DOM Functions Behavior Unverified
+p5.js may auto-bind DOM functions (`createButton()`, `createCheckbox()`, `createRadio()`,
+`createSlider()`, `createColorPicker()`, `createInput()`, `createFileInput()`,
+`createSelect()`, `createDiv()`, `createP()`, `createSpan()`, `createImg()`, `createA()`,
+`createVideo()`, `createCapture()`, `createTextarea()`) via `_bindGlobals()`. Their actual
+behavior in headless has not been tested. Need to audit what p5.js exposes and whether
+calls succeed, silently fail, or crash.
+
+### select(), selectAll(), removeElements() Not Implemented
+These query/manipulate p5-created DOM elements. In headless, all elements live in the DOM
+shim — these should query/manipulate the shim's tracked elements rather than a real DOM.
+Non-trivial to implement correctly.
+
+> Accepted tradeoff (not a task): `loadFont()` is synchronous (blocking file I/O) while
+> `loadJSON()` is async. Known inconsistency vs browser p5.js where both share the
+> callback/preload pattern.
 
 ---
 
-## Released
+## Priority 2 — headless-gl WebGL Memory Leak
 
-- `loadImage()` canvas v3 fixes (async decode wait + ArrayBuffer slice) shipped in [1.2.2](CHANGELOG.md).
-- v1 `loadJSON()` now matches real p5 v1 semantics: returns a data object synchronously, supports `loadJSON(path, callback, errorCallback)`, errors go to `errorCallback` (not a rejected promise). Resolves the former "loadJSON Callback Compatibility" API gap (v1).
-- v2 fidelity + dedup cleanup: removed v1-normalizing `join()`/`split()`/`trim()` shims and the `loadTable()` TableRow patch so p5b v2 matches real p5 v2 browser behavior (incl. upstream quirks); extracted shared helpers to `p5b-base.js` (`_fetchJson`, `_readTextLines`, `_wrapSetup`, `_syncCanvasGlobals`, `_preloadHandle`, `_readFont`, `_removeGraphics`, `_pixels`, `_letterbox`) and centralized `resolveAssetPath`/`resolveAssetUrl`/`splitLines`; `noop` moved to `globals.js`. This resolves the former "Asset Path/URL Duplication", "Preload Counter Duplication", and "`fetch` Bound at Init Time" backlog items.
+**Symptom:** Node process balloons >600MB rapidly when running a WEBGL sketch with shaders
+(`sketch-earthday.js` with `baseMaterialShader().modify(...)`, `createCanvas(32, 32, WEBGL)`,
+per-frame uniforms).
+
+**Suspected cause:** headless-gl doesn't release GPU/CPU buffers between frames — likely
+shader objects, textures, or framebuffers accumulating without cleanup.
+
+**Reproduction**
+```bash
+cd examples
+node ex-terminal-cli.js sketch-earthday.js
+# watch RSS; should stabilize ~50MB, if climbing past 200MB → leak confirmed
+```
+
+**Investigation steps**
+1. Verify GL resource growth — track `gl.getParameter(gl.CURRENT_PROGRAM)` / RSS before/after `toFrame()`.
+2. Check p5 WebGL renderer cleanup — does p5 call `gl.deleteTexture` / `deleteFramebuffer` / `deleteProgram` / `deleteShader`? (`node_modules/p5/src/webgl/`; v1 vs v2 may differ.)
+3. Check `remove()` teardown — does `this._myP5.remove()` destroy GL resources headlessly?
+4. Explicit cleanup in `toFrame()` — after pixel read: `gl.bindFramebuffer(gl.FRAMEBUFFER, null)`; `gl.bindTexture(gl.TEXTURE_2D, null)`.
+5. GL object pool/cap — if recompilation confirmed, intercept `gl.createProgram`/`createShader` with a capped pool.
+6. headless-gl resize interaction — does `STACKGL_resize_drawingbuffer` on same dims still reallocate?
+
+**Files to modify:** `p5b-base.js` (`toFrame()` read path), `p5b-dom.js` (`getContext` intercept).
+
+**Fix criteria:** RSS stable across 100+ frames of `sketch-earthday.js` at `createCanvas(32, 32, WEBGL)`.
 
 ---
 
-## Backlog
+## Priority 3 — Lower Priority / Future Work
 
-Lower priority issues identified during code review. Not scoped to any specific release.
+### Global Alpha Override
+Add an `alpha` property to P5b config (integer in [0, 255]) to apply constant opacity to
+every emitted frame. **Fix:** scale the RGBA frame buffer alpha channel by `alpha / 255`
+in `toFrame()`. (Next v1.3.0 candidate.)
 
-### Code Quality
+### Canvas Rendering Optimization
+Render headless CPU-only 2D (1 sketch at a time, no GPU). Current stack: `node-canvas`
+(Cairo); bottleneck Cairo rasterization + BGRA→RGBA swap.
+- **Tier 1 (2–3x over Cairo):** swap `canvas` → `skia-canvas` or `@napi-rs/canvas`; near drop-in; minimal p5b changes.
+- **Tier 2 (2–3x over Skia):** `tiny-skia` (pure Rust) — no existing node bindings; needs custom napi addon.
+- **Tier 3 (5–8x over Cairo):** custom Rust napi addon w/ SIMD rasterization; significant effort; only after Tier 1 shows Skia insufficient.
+- **Ruled out:** GPU rasterization (Vello/WebGPU) — GPU→CPU readback (~1–5ms/frame) negates gain for single-buffer output. Worker threads — improve batch throughput, not single-frame latency.
+- **Recommended path:** (1) benchmark node-canvas on representative sketches; (2) swap to Skia, re-benchmark; (3) evaluate vs target FPS; (4) only pursue Tier 2/3 if Skia falls short. At 30fps Cairo handles simple/moderate; 60fps complex hits the wall — Skia gives headroom.
 
-#### `async preload()` Semantics
-If a sketch uses `async function preload() { await loadJSON(...) }`, p5.js never awaits the returned promise. p5b mitigates this: v1 load functions use `_preloadHandle()` to increment/decrement p5's own preload counter, so p5's lifecycle blocks until p5b-managed loads settle. Native p5 (WebGL/`loadFont` in v1) loads inside an async preload are not tracked. Should detect and warn. **v1-only** — v2 rejects `preload` configs entirely.
-
-#### `loadFont()` vs `loadJSON()` Inconsistency
-`loadFont()` is synchronous (blocking file I/O). `loadJSON()` is async. Surprising difference for users familiar with p5.js where both use the same callback/preload pattern. Accepted as a known design tradeoff.
-
-### API Gaps
-
-#### `loadStrings()` HTTP Support
-`loadStrings()` supports local files only. `loadImage()` and `loadJSON()` both support HTTP URLs. Inconsistent.
-
-#### `loadBytes()` Missing
-`loadBytes()` is not implemented. Calls will throw `"loadBytes is not defined"` with no helpful error.
-
-#### `loadXML()` Missing
-`loadXML()` is not implemented. Calls will throw `"loadXML is not defined"` with no helpful error.
-
-#### DOM Functions Behavior Unverified
-p5.js may auto-bind DOM functions (`createButton()`, `createCheckbox()`, `createRadio()`, `createSlider()`, `createColorPicker()`, `createInput()`, `createFileInput()`, `createSelect()`, `createDiv()`, `createP()`, `createSpan()`, `createImg()`, `createA()`, `createVideo()`, `createCapture()`, `createTextarea()`) via `_bindGlobals()`. Their actual behavior in headless has not been tested. Need to audit what p5.js exposes and whether calls succeed, silently fail, or crash.
-
-#### `select()`, `selectAll()`, `removeElements()` Not Implemented
-These query and manipulate p5-created DOM elements. In headless, all elements live in the DOM shim — these functions should query/manipulate the shim's tracked elements rather than a real browser DOM. Non-trivial to implement correctly.
+### WebGL gifenc patch (pending verify/close)
+p5-v2 transitively depends on `gifenc` (no `exports` field), which caused
+`ERR_PACKAGE_PATH_NOT_EXPORTED` under `build-readme.js`. Planned `patches/gifenc@1.0.3.patch`
++ `patchedDependencies` was never created — `build-readme.js` currently runs green under
+p5-v2, likely resolved via bun's loose `exports`. Verify and close.
 
 ---
 
 ## Known Unsupported (By Design)
 
-These require browser APIs unavailable in Node.js.
+Require browser APIs unavailable in Node.js.
 
 ### Sound (p5.sound)
-
 | Missing |
 |---------|
 | `loadSound`, `loadAudio`, `createAudio` |
@@ -64,14 +104,53 @@ These require browser APIs unavailable in Node.js.
 | `play`, `pause`, `loop`, `stop`, `jump`, `rate`, `amp` |
 
 ### Video/Capture
-
 | Missing |
 |---------|
 | `createCapture(VIDEO/AUDIO)`, `createVideo()` |
 
 ### 3D/WebGL
+- **v1:** `createCanvas(w, h, WEBGL)` throws by design (`p5b_v1.js`).
+- **v2:** WebGL 1 works headlessly via `headless-gl` (context intercept in `p5b-dom.js`;
+  `isP3D` read path in `toFrame()`). WebGL 2 unsupported (headless-gl is WebGL 1 only).
+  Caveat: shader sketches can leak memory — see Priority 2.
 
-Status differs by adapter:
+---
 
-- **v1** (`p5b_v1.js`): `createCanvas(w, h, WEBGL)` throws by design.
-- **v2** (`p5b_v2.js`): WebGL 1 works headlessly via `headless-gl` (context interception in `p5b-dom.js`; `isP3D` read path in `toFrame()`). WebGL 2 is not supported (headless-gl is WebGL 1 only). Known caveat: shader sketches can leak memory — see `MEMLEAK.md`.
+# Completed Items
+
+- **`loadImage()` canvas v3 fixes** — async decode wait + ArrayBuffer slice (shipped 1.2.2).
+- **v1 `loadJSON()` real p5 v1 semantics** — returns data object synchronously; supports
+  `loadJSON(path, callback, errorCallback)`; errors via `errorCallback` (not rejected promise).
+- **v2 fidelity + dedup cleanup** — removed v1-normalizing `join()`/`split()`/`trim()` shims
+  and the `loadTable()` TableRow patch; centralized `resolveAssetPath`/`resolveAssetUrl`/
+  `splitLines` + standalone `fetchJSON`; extracted base helpers `_readTextLines`,
+  `_syncCanvasGlobals`, `_preloadHandle`, `_readFont`, `_removeGraphics`, `_pixels`,
+  `_letterbox`; `noop` moved to `globals.js`.
+- **async/await contained to v2** — base/dom/v1 are async-keyword-free; `fetchJSON` is a
+  standalone `.then()`-based loader; removed `_fetchJson` method and `_wrapSetup` wrapper;
+  v1 keeps a sync setup wrapper; dom `_load` rewritten to `.then()` with sync-throw→`onError`.
+- **`p5Version` config** — renamed from `p5Major`; adapter-forced (1/2); validated in base
+  via `[1, 2].includes(this.p5Version)`; covered by tests (incl. rejection of 99/"2").
+- **Asset-loading dedup (CLEANUP.md)** — URL/asset-path resolution single-sourced; shared
+  `file://` response shim confirmed in dom; error semantics normalized (v2 loadJSON try/catch
+  removed, v2 rejects, v1 falls through to errorCallback, preload counter always clears).
+- **`noop` dedup** — single definition in `globals.js`, imported by base/adapters/dom.
+- **`_propertySetter` reconciled** — base owns the readonly-prop swallow; adapters supply only
+  the p5 instance.
+- **v2 `loadImage()` returns Promise** — `await loadImage()` works in async `setup()`;
+  legacy `onSuccess`/`onError` still fire.
+- **Full async/await in v2** — `setup()` and `draw()` support async; v2 `_initDrawWrapper()`
+  awaits async draw before emitting frames; preload tracking (`_pendingLoads`,
+  `_preloadIncrement`/`_preloadDecrement`, `_waitForPreloads`) removed; v2 `preload` config rejected.
+- **v2 WebGL shims (WEBGL_TASKS 1–6)** — canvas `parentElement` mirror + `insertBefore` on
+  `detachedParent`/`document.body`; `getContext` intercept routing WebGL to `headless-gl`
+  (returns null for `webgl2`); width/height `STACKGL_resize_drawingbuffer` resize; `window`
+  Proxy forwarding shader hooks to `global`; `document.fonts` API; `toFrame()` `isP3D` read path.
+- **Adapter selection (V2_SUPPORT.md)** — package-name convention via `P5B_P5_PATH`
+  (`p5` → v1, `p5-v2` → v2); `_detectP5Version()` dropped by design; p5 moved to
+  `peerDependencies` `^1.11.0 || ^2.0.0`; both shipped as `devDependencies`.
+- **Tests & CI (V2_SUPPORT.md)** — `test:v1`, `test:v2`, `test:all`; CI `[v1, v2]` matrix;
+  env-driven version detection; README compatibility table, `P5B_P5_PATH` docs, v2
+  limitations, async `setup()` note.
+- **Coverage HTML report** — `coverage:html` script (`scripts/coverage-report.js`) runs both
+  suites, merges lcov, renders `coverage/html/index.html`; `coverage/` is gitignored.
