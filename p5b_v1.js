@@ -1,6 +1,11 @@
 const fs = require("fs");
-const { P5bBase, P5B_DEFAULTS, fetchJSON, reorderBuffer, resolveAssetPath, resolveAssetUrl, splitLines } = require("./p5b-base");
-const { noop } = require("./globals");
+const { P5bBase, P5B_DEFAULTS, request, fetchJSON, reorderBuffer, resolveAssetPath, resolveAssetUrl, splitLines } = require("./p5b-base");
+const { isAsyncFunction, noop } = require("./globals");
+
+// Names of the lifecycle hooks that are async functions. v1 does not support
+// async/await in preload/setup/draw.
+const asyncHookNames = (hooks) =>
+    ["preload", "setup", "draw"].filter((name) => isAsyncFunction(hooks[name]));
 
 class P5b extends P5bBase {
     constructor(config = {}) {
@@ -24,6 +29,18 @@ class P5b extends P5bBase {
     }
 
     _initSketch() {
+        // Sketch-file lifecycle hooks (bound by the vm exec in _bindGlobals) can't be
+        // rejected at construction. Detect async preload/setup/draw here, emit an error,
+        // and halt the sketch.
+        const asyncHooks = asyncHookNames(global);
+        if (asyncHooks.length > 0) {
+            const error = new Error(
+                `async/await is not supported in p5.js v1 lifecycle hooks. Remove 'async' from: ${asyncHooks.join(", ")}`
+            );
+            this._emitRuntimeError(error, "setup");
+            this.stop();
+        }
+
         this._myP5.frameRate(this.fps);
 
         // p5 v1 in Node.js calls global.preload() directly (window===global) AND this._myP5.preload().
@@ -148,16 +165,41 @@ class P5b extends P5bBase {
 
         global.loadStrings = (filePath, callback, errorCallback) => {
             const done = this._preloadHandle();
-            try {
-                const lines = this._readTextLines(resolveAssetPath(this.sketchPath, filePath));
-                if (callback) callback(lines);
-                done();
-                return lines;
-            } catch (error) {
-                done();
-                if (errorCallback) errorCallback(error);
-                else console.error(`Failed to load strings: ${error.message}`);
-            }
+            const ret = [];
+
+            // Matches native p5 v1: returns an empty array synchronously, populated once
+            // loaded via request() (HTTP URLs + local files through the DOM fetch shim);
+            // the preload counter blocks setup until it settles.
+            request(resolveAssetUrl(this.sketchPath, filePath), "text")
+                .then((data) => {
+                    // Native p5 v1 line splitting: normalize CRLF/CR/LF to CR, split on CR.
+                    const lines = data.replace(/\r\n/g, "\r").replace(/\n/g, "\r").split(/\r/);
+                    // Chunked push (as native v1 does) avoids stack overflow on >100k-line files.
+                    const QUANTUM = 32768;
+                    for (let i = 0; i < lines.length; i += QUANTUM) {
+                        Array.prototype.push.apply(ret, lines.slice(i, Math.min(i + QUANTUM, lines.length)));
+                    }
+                    if (callback) callback(ret);
+                })
+                .catch((error) => {
+                    if (errorCallback) errorCallback(error);
+                    else console.error(`Failed to load strings: ${error.message}`);
+                })
+                .then(done);
+            return ret;
+        };
+
+        // Matches native p5 v1: returns an empty object synchronously, populated once
+        // loaded via request() (HTTP URLs + local files through the DOM fetch shim);
+        // the preload counter blocks setup until it settles.
+        global.loadBytes = (file, callback, errorCallback) => {
+            const done = this._preloadHandle();
+            const ret = {};
+            request(resolveAssetUrl(this.sketchPath, file), "arrayBuffer")
+                .then((arrayBuffer) => { ret.bytes = new Uint8Array(arrayBuffer); if (callback) callback(ret); })
+                .catch((error) => { if (errorCallback) errorCallback(error); else console.error(`Failed to load bytes: ${error.message}`); })
+                .then(done);
+            return ret;
         };
 
         global.loadTable = (filePath, ...args) => {
@@ -221,6 +263,13 @@ class P5b extends P5bBase {
         super._validateConfig();
         if (this.preload && typeof this.preload !== "function") {
             throw new Error("Invalid config: preload must be a function.");
+        }
+
+        const asyncHooks = asyncHookNames(this);
+        if (asyncHooks.length > 0) {
+            throw new Error(
+                `async/await is not supported in p5.js v1 lifecycle hooks. Remove 'async' from: ${asyncHooks.join(", ")}`
+            );
         }
     }
 }

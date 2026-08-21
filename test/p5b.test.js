@@ -105,6 +105,18 @@ describe("P5b Configuration Validation", () => {
     it("should reject non-function draw", () => {
         expect(() => new P5b({ draw: {} })).toThrow("draw must be a function");
     });
+
+    it.skipIf(isP5v2)("should reject async setup", () => {
+        expect(() => new P5b({ setup: async () => {} })).toThrow("async/await is not supported in p5.js v1");
+    });
+
+    it.skipIf(isP5v2)("should reject async draw", () => {
+        expect(() => new P5b({ draw: async () => {} })).toThrow("async/await is not supported in p5.js v1");
+    });
+
+    it.skipIf(isP5v2)("should reject async preload", () => {
+        expect(() => new P5b({ preload: async () => {} })).toThrow("async/await is not supported in p5.js v1");
+    });
 });
 
 describe("P5b Instance Management", () => {
@@ -272,12 +284,15 @@ describe("P5b Global Bindings", () => {
         const fontPath = path.join(process.cwd(), "test/fixtures/font/SourceCodePro-Regular.ttf");
         let loadedFont = null;
 
+        // loadFont is synchronous in p5 v1, async in p5 v2. v1 rejects async setup,
+        // so select the matching setup form for the active adapter.
+        const setup = isP5v2
+            ? async () => { createCanvas(64, 64); loadedFont = await loadFont(fontPath); }
+            : () => { createCanvas(64, 64); loadedFont = loadFont(fontPath); };
+
         const p5b = new P5b({
             width: 32, height: 32,
-            setup: async () => {
-                createCanvas(64, 64);
-                loadedFont = await loadFont(fontPath);
-            },
+            setup,
             draw: () => { background(100); }
         });
 
@@ -293,9 +308,8 @@ describe("P5b Global Bindings", () => {
     });
 
     it("should throw with friendly message when font file not found", (done) => {
-        const p5b = new P5b({
-            width: 32, height: 32,
-            setup: async () => {
+        const setup = isP5v2
+            ? async () => {
                 createCanvas(64, 64);
                 try {
                     await loadFont("/nonexistent/path/to/font.ttf");
@@ -303,7 +317,20 @@ describe("P5b Global Bindings", () => {
                     expect(error.message).toContain("Failed to load font");
                     expect(error.message).toContain("file not found");
                 }
-            },
+            }
+            : () => {
+                createCanvas(64, 64);
+                try {
+                    loadFont("/nonexistent/path/to/font.ttf");
+                } catch (error) {
+                    expect(error.message).toContain("Failed to load font");
+                    expect(error.message).toContain("file not found");
+                }
+            };
+
+        const p5b = new P5b({
+            width: 32, height: 32,
+            setup,
             draw: () => { background(100); }
         });
 

@@ -1,6 +1,6 @@
 const canvas = require("canvas");
 const path = require("path");
-const { P5bBase, P5B_DEFAULTS, fetchJSON, reorderBuffer, resolveAssetPath, resolveAssetUrl } = require("./p5b-base");
+const { P5bBase, P5B_DEFAULTS, request, fetchJSON, reorderBuffer, resolveAssetPath, resolveAssetUrl } = require("./p5b-base");
 
 class P5b extends P5bBase {
     constructor(config = {}) {
@@ -153,12 +153,28 @@ class P5b extends P5bBase {
 
         global.loadStrings = async (filePath, callback, errorCallback) => {
             try {
-                const lines = this._readTextLines(resolveAssetPath(this.sketchPath, filePath));
-                if (callback) callback(lines);
+                // Matches native p5 v2: fetch-based (URLs + local files via the DOM shim),
+                // split on LF/CRLF. Returns the lines array (or callback result).
+                const data = await request(resolveAssetUrl(this.sketchPath, filePath), "text");
+                const lines = data.split(/\r?\n/);
+                if (callback) return callback(lines);
                 return lines;
             } catch (error) {
-                if (errorCallback) errorCallback(error);
-                else console.error(`Failed to load strings: ${error.message}`);
+                if (errorCallback) return errorCallback(error);
+                throw error;
+            }
+        };
+
+        global.loadBytes = async (file, callback, errorCallback) => {
+            try {
+                // Matches native p5 v2: returns a Promise resolving to a Uint8Array.
+                const arrayBuffer = await request(resolveAssetUrl(this.sketchPath, file), "arrayBuffer");
+                const bytes = new Uint8Array(arrayBuffer);
+                if (callback) return callback(bytes);
+                return bytes;
+            } catch (error) {
+                if (errorCallback) return errorCallback(error);
+                throw error;
             }
         };
 

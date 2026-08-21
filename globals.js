@@ -4,6 +4,11 @@
 
 const noop = () => {};
 
+// True when fn is declared with the async keyword (async declarations, expressions,
+// and arrows). Used by the v1 adapter to reject async lifecycle hooks. Never invokes fn.
+const isAsyncFunction = (fn) =>
+    typeof fn === "function" && fn.constructor.name === "AsyncFunction";
+
 const mathFunctions = {
     abs: Math.abs, ceil: Math.ceil, floor: Math.floor, round: Math.round,
     pow: Math.pow, sqrt: Math.sqrt, exp: Math.exp, log: Math.log,
@@ -44,4 +49,4 @@ const p5Constants = {
     FLAT: "flat", SMOOTH: "smooth", LANDSCAPE: "landscape", PORTRAIT: "portrait",
 };
 
-module.exports = { noop, mathConstants, mathFunctions, p5Constants };
+module.exports = { noop, isAsyncFunction, mathConstants, mathFunctions, p5Constants };

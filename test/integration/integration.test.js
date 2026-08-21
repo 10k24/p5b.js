@@ -405,6 +405,24 @@ desc("P5b Integration - Buffer Analysis", () => {
         p5b.run();
     });
 
+    it.skipIf(isP5v2)("sketch-file async setup emits error and stops", (done) => {
+        const sketchPath = path.resolve(process.cwd(), "test/fixtures/sketches/async-setup.js");
+        const p5b = new P5b({
+            width: 32,
+            height: 32,
+            fps: 30,
+            sketchPath: sketchPath
+        });
+
+        p5b.on("error", (evt) => {
+            expect(evt.phase).toBe("setup");
+            expect(evt.error.message).toContain("async/await is not supported in p5.js v1");
+            done();
+        });
+
+        p5b.run();
+    });
+
     it("should track metrics correctly", (done) => {
         const p5b = new P5b({
             width: 32,
@@ -2084,10 +2102,8 @@ desc("P5b Integration - Data/IO", () => {
         p5b.on("error", (e) => { p5b.stop(); done(e.error); });
         p5b.on("frame", () => {
             expect(Array.isArray(lines)).toBe(true);
-            expect(lines.length).toBe(3);
-            expect(lines[0]).toBe("line one");
-            expect(lines[1]).toBe("line two");
-            expect(lines[2]).toBe("line three");
+            // Native p5 v1 keeps the trailing empty line from a file ending in a newline.
+            expect(lines).toEqual(["line one", "line two", "line three", ""]);
             p5b.stop();
             done();
         });
@@ -2110,7 +2126,81 @@ desc("P5b Integration - Data/IO", () => {
         p5b.on("error", (e) => { p5b.stop(); done(e.error); });
         p5b.on("frame", () => {
             expect(Array.isArray(callbackLines)).toBe(true);
-            expect(callbackLines.length).toBe(3);
+            // Native p5 v1 keeps the trailing empty line from a file ending in a newline.
+            expect(callbackLines).toEqual(["line one", "line two", "line three", ""]);
+            p5b.stop();
+            done();
+        });
+        p5b.run();
+    });
+
+    // Native p5 v2 loadStrings is fetch-based (URLs + local files via the DOM shim) and
+    // splits on /\r?\n/, so a file ending in a newline yields a trailing empty string.
+    it.skipIf(!isP5v2)("v2: loadStrings() returns lines via fetch", (done) => {
+        const txtPath = path.resolve(process.cwd(), "test/fixtures/data/test.txt");
+        let lines;
+
+        const p5b = new P5b({
+            width: 16, height: 16, fps: 30,
+            setup: async () => {
+                createCanvas(16, 16);
+                lines = await loadStrings(txtPath);
+            },
+            draw: () => { noLoop(); }
+        });
+
+        p5b.on("error", (e) => { p5b.stop(); done(e.error); });
+        p5b.on("frame", () => {
+            expect(Array.isArray(lines)).toBe(true);
+            expect(lines).toEqual(["line one", "line two", "line three", ""]);
+            p5b.stop();
+            done();
+        });
+        p5b.run();
+    });
+
+    // Native p5 v1 loadBytes returns an object whose .bytes is a Uint8Array, populated
+    // via the preload counter.
+    it.skipIf(isP5v2)("loadBytes() in preload returns bytes as Uint8Array", (done) => {
+        const txtPath = path.resolve(process.cwd(), "test/fixtures/data/test.txt");
+        let bytes;
+
+        const p5b = new P5b({
+            width: 16, height: 16, fps: 30,
+            preload: () => { bytes = loadBytes(txtPath); },
+            setup: () => { createCanvas(16, 16); },
+            draw: () => { noLoop(); }
+        });
+
+        p5b.on("error", (e) => { p5b.stop(); done(e.error); });
+        p5b.on("frame", () => {
+            expect(bytes).toBeDefined();
+            expect(bytes.bytes).toBeInstanceOf(Uint8Array);
+            expect(bytes.bytes).toEqual(new Uint8Array(Buffer.from("line one\nline two\nline three\n")));
+            p5b.stop();
+            done();
+        });
+        p5b.run();
+    });
+
+    // Native p5 v2 loadBytes returns a Promise resolving to a Uint8Array.
+    it.skipIf(!isP5v2)("v2: loadBytes() returns Uint8Array via fetch", (done) => {
+        const txtPath = path.resolve(process.cwd(), "test/fixtures/data/test.txt");
+        let bytes;
+
+        const p5b = new P5b({
+            width: 16, height: 16, fps: 30,
+            setup: async () => {
+                createCanvas(16, 16);
+                bytes = await loadBytes(txtPath);
+            },
+            draw: () => { noLoop(); }
+        });
+
+        p5b.on("error", (e) => { p5b.stop(); done(e.error); });
+        p5b.on("frame", () => {
+            expect(bytes).toBeInstanceOf(Uint8Array);
+            expect(bytes).toEqual(new Uint8Array(Buffer.from("line one\nline two\nline three\n")));
             p5b.stop();
             done();
         });

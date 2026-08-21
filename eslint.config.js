@@ -79,6 +79,7 @@ module.exports = [
                 accelerationY: "readonly",
                 accelerationZ: "readonly",
                 loadImage: "readonly",
+                loadBytes: "readonly",
                 noLoop: "readonly",
                 path: "readonly",
                 // Static constants + Math pass-throughs (single source: globals.js)

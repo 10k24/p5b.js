@@ -49,15 +49,22 @@ const resolveAssetUrl = (sketchPath, filePath) => {
 const splitLines = (content) =>
     content.replace(/\r\n/g, "\r").replace(/\n/g, "\r").split(/\r/);
 
-// Fetch and parse a JSON resource, throwing a descriptive error on non-OK.
-// Shared by v1/v2 loadJSON (module-level: stateless).
-const fetchJSON = (url) =>
+// Fetch a resource and parse it as the requested type ('json' | 'text' | 'arrayBuffer'),
+// throwing a descriptive error on non-OK responses. Shared by v1/v2 loadJSON/loadStrings/
+// loadBytes (module-level: stateless). Mirrors p5 v2's request() helper.
+const request = (url, type) =>
     global.fetch(url).then((response) => {
         if (!response.ok) {
-            throw new Error(`Failed to load JSON: ${response.status} ${response.statusText}`);
+            throw new Error(`Failed to load ${type}: ${response.status} ${response.statusText}`);
         }
-        return response.json();
+        if (type === "json") return response.json();
+        if (type === "text") return response.text();
+        if (type === "arrayBuffer") return response.arrayBuffer();
+        throw new Error(`Unsupported response type: ${type}`);
     });
+
+// Fetch and parse a JSON resource (v1/v2 loadJSON). Thin wrapper over request().
+const fetchJSON = (url) => request(url, "json");
 
 class P5bBase extends EventEmitter {
     constructor(config = {}) {
@@ -165,14 +172,6 @@ class P5bBase extends EventEmitter {
         const p5 = this._myP5;
         p5._incrementPreload();
         return () => setImmediate(() => p5._decrementPreload());
-    }
-
-    // Read file content into lines, dropping the trailing empty line splitLines
-    // produces after a final newline. Shared by v1/v2 loadStrings.
-    _readTextLines(resolvedPath) {
-        const lines = splitLines(fs.readFileSync(resolvedPath, "utf8"));
-        if (lines.length > 0 && lines[lines.length - 1] === "") lines.pop();
-        return lines;
     }
 
     // After createCanvas(), mirror size/context onto the p5 instance. Tolerant of
@@ -340,6 +339,7 @@ class P5bBase extends EventEmitter {
         if (bucket.length < this.maxPoolSize) bucket.push(pg);
     }
 
+    // TODO: need better function naming scheme on all of these + _gfx*
     // Full cleanup for a graphics object on remove(): detach DOM, untrack from the DOM,
     // remove from _elements/_gfxActive so _afterDraw won't re-pool it, then return to pool.
     _removeGraphics(ret, key) {
@@ -409,4 +409,4 @@ class P5bBase extends EventEmitter {
     }
 }
 
-module.exports = { P5bBase, P5B_DEFAULTS, fetchJSON, reorderBuffer, resolveAssetPath, resolveAssetUrl, splitLines };
+module.exports = { P5bBase, P5B_DEFAULTS, request, fetchJSON, reorderBuffer, resolveAssetPath, resolveAssetUrl, splitLines };

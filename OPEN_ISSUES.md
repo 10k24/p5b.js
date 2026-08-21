@@ -2,23 +2,6 @@
 
 ## Priority 1 — API Gaps & Semantics
 
-### async preload() Semantics (v1)
-If a sketch uses `async function preload() { await loadJSON(...) }`, p5.js never awaits
-the returned promise. p5b mitigates this: v1 load functions use `_preloadHandle()` to
-increment/decrement p5's own preload counter, so p5's lifecycle blocks until p5b-managed
-loads settle. Native p5 (WebGL/`loadFont` in v1) loads inside an async preload are not
-tracked. Should detect and warn. **v1-only** — v2 rejects `preload` configs entirely.
-
-### loadStrings() HTTP Support
-`loadStrings()` supports local files only. `loadImage()` and `loadJSON()` both support
-HTTP URLs. Inconsistent.
-
-### loadBytes() Missing
-`loadBytes()` is not implemented. Calls throw `"loadBytes is not defined"` with no helpful error.
-
-### loadXML() Missing
-`loadXML()` is not implemented. Calls throw `"loadXML is not defined"` with no helpful error.
-
 ### DOM Functions Behavior Unverified
 p5.js may auto-bind DOM functions (`createButton()`, `createCheckbox()`, `createRadio()`,
 `createSlider()`, `createColorPicker()`, `createInput()`, `createFileInput()`,
@@ -70,10 +53,22 @@ node ex-terminal-cli.js sketch-earthday.js
 
 ## Priority 3 — Lower Priority / Future Work
 
+### Create `lib` directory
+Only `p5b.js` and `p5b.mjs` should be in the root. Other JS files should move under `lib`. Leave `eslint.config.js` where it is.
+Update all require and import paths to match their new location.
+
 ### Global Alpha Override
 Add an `alpha` property to P5b config (integer in [0, 255]) to apply constant opacity to
 every emitted frame. **Fix:** scale the RGBA frame buffer alpha channel by `alpha / 255`
 in `toFrame()`. (Next v1.3.0 candidate.)
+
+### loadXML() (future work)
+`loadXML()` is not implemented. Calls throw `"loadXML is not defined"` with no helpful error.
+Blocked on a browser-only dependency: both p5 v1 (`httpDo(..., 'xml')`) and p5 v2
+(`new DOMParser().parseFromString(...)`) parse XML via the `DOMParser` global, which Node
+doesn't provide. Faithful support needs a `DOMParser` shim or third-party XML→DOM parser,
+plus the `p5.XML` wrapper API (children/attributes traversal). Same class of browser-API gap
+as sound/video. Would also conflict with p5b's minimal-dependency philosophy.
 
 ### Canvas Rendering Optimization
 Render headless CPU-only 2D (1 sketch at a time, no GPU). Current stack: `node-canvas`
@@ -118,6 +113,20 @@ Require browser APIs unavailable in Node.js.
 
 # Completed Items
 
+- **`loadBytes()` (v1 + v2)** — implemented via the shared `request(url, "arrayBuffer")`
+  helper (new `arrayBuffer` response type). v1 mirrors native p5 v1 (returns `{}` shell with
+  `.bytes` as `Uint8Array`, preload-counter-gated); v2 mirrors native p5 v2 (Promise resolving
+  to `Uint8Array`). HTTP URLs + local files both work. Resolves the "loadBytes() Missing" gap.
+- **`loadStrings()` HTTP-capable (v1 + v2)** — both adapters now fetch via the shared
+  `request(url, type)` helper (`fetchJSON` delegates to it), supporting HTTP URLs + local
+  files through the DOM fetch shim, with no `async`/`await` in the v1 codepath. v1 mirrors
+  native p5 v1 (returns `[]` shell synchronously, preload-counter-gated, native CR→split +
+  chunked push); v2 mirrors native p5 v2 (`split(/\r?\n/)`). Resolves the "loadStrings() HTTP Support" gap.
+- **v1 rejects async lifecycle hooks** — `preload`/`setup`/`draw` declared `async` throw
+  `"async/await is not supported in p5.js v1 lifecycle hooks"`. Config-sourced hooks rejected
+  synchronously in `_validateConfig()`; sketch-file-sourced hooks detected in `_initSketch()`
+  (emit `"error"` + `stop()`). Uses non-invoking `isAsyncFunction` from `globals.js`. Resolves
+  the former "async preload() Semantics (v1)" detection item. Covered by v1-only tests + fixture.
 - **`loadImage()` canvas v3 fixes** — async decode wait + ArrayBuffer slice (shipped 1.2.2).
 - **v1 `loadJSON()` real p5 v1 semantics** — returns data object synchronously; supports
   `loadJSON(path, callback, errorCallback)`; errors via `errorCallback` (not rejected promise).
