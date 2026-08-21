@@ -34,6 +34,7 @@
         "test:v2": "P5B_P5_PATH=p5-v2 bun test",
         "test:all": "bun run test:v1 && bun run test:v2",
         "test:coverage": "P5B_P5_PATH=p5 bun test --coverage && P5B_P5_PATH=p5-v2 bun test --coverage",
+        "coverage:html": "node scripts/coverage-report.js",
         "test:watch": "bun test --watch",
         "lint": "bunx eslint",
         "drift": "node scripts/compare-adapters.js",
