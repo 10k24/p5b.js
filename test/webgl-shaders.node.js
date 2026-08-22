@@ -54,6 +54,26 @@ function runSketch(file, width, height, minLitFraction) {
     });
 }
 
+// Read the renderer's isP3D flag (white-box, matching toFrame()'s Boolean(isP3D))
+// for a real sketch after its first frame.
+function getIsP3D(file, width, height) {
+    return new Promise((resolve, reject) => {
+        const sketchPath = path.resolve(process.cwd(), `test/fixtures/sketches/${file}`);
+        const p5b = new P5b({ width, height, fps: 30, sketchPath });
+
+        p5b.on("error", (e) => {
+            p5b.remove();
+            reject(e.error);
+        });
+        p5b.on("frame", () => {
+            const isP3D = Boolean(p5b._myP5?._renderer?.isP3D);
+            p5b.remove();
+            resolve(isP3D);
+        });
+        p5b.run();
+    });
+}
+
 test("headless-gl loads under node", () => {
     assert.ok(glAvailable, `headless-gl not loadable: ${glError}`);
 });
@@ -69,3 +89,13 @@ for (const c of CASES) {
         );
     });
 }
+
+test("isP3D is true for a WEBGL sketch (3D renderer)", async () => {
+    const isP3D = await getIsP3D("webgl-box.js", 64, 64);
+    assert.strictEqual(isP3D, true, "WEBGL sketch should report a P3D renderer");
+});
+
+test("isP3D is false for a 2D sketch (2D renderer)", async () => {
+    const isP3D = await getIsP3D("shapes.js", 128, 128);
+    assert.strictEqual(isP3D, false, "2D sketch should not report a P3D renderer");
+});

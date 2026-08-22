@@ -1,6 +1,6 @@
 # Open Issues - p5b.js
 
-## Priority 2.5 — API Gaps & Semantics
+## Priority 1 — API Gaps & Semantics
 
 ### DOM Functions Behavior Unverified
 p5.js may auto-bind DOM functions (`createButton()`, `createCheckbox()`, `createRadio()`,
@@ -15,54 +15,54 @@ These query/manipulate p5-created DOM elements. In headless, all elements live i
 shim — these should query/manipulate the shim's tracked elements rather than a real DOM.
 Non-trivial to implement correctly.
 
+### API Gap Inventory (p5.js vs p5b)
+`_bindGlobals()` walks the p5 instance prototype chain and binds every function to global,
+so the surface is gated by what p5b noops, and by functions that bind but need a browser
+API absent headless. Categorized gaps:
+
+**1. Explicitly noop'd — present but silently swallow calls (`lib/p5b-base.js`):**
+- Accessibility: `describe`, `describeElement`, `textOutput`, `gridOutput`
+- Save/export: `saveCanvas`, `saveFrames`, `saveJSON`, `saveStrings`, `saveTable`, `saveImage`
+  — note plain `save()` is **not** noop'd: it binds and attempts a DOM download (real gap).
+- Input handlers (no headless input): `mousePressed`, `mouseReleased`, `mouseMoved`,
+  `mouseDragged`, `mouseWheel`, `keyPressed`, `keyReleased`, `touchStarted`, `touchEnded`,
+  `touchMoved`
+- Cursor: `cursor`, `noCursor`
+- Audio (p5.sound): `loadSound`, `loadAudio`, `createAudio`, `getAudioContext`,
+  `userStartAudio`, `soundFormats`
+- Input/accel state forced to zero: `mouseX/Y`, `pmouseX/Y`, `key`, `keyCode`,
+  `accelerationX/Y/Z`
+
+**2. Bind via prototype walk but fail/misbehave headless (no explicit handling):**
+- DOM creation (unverified): `createButton`, `createCheckbox`, `createRadio`, `createSlider`,
+  `createColorPicker`, `createInput`, `createFileInput`, `createSelect`, `createDiv`,
+  `createP`, `createSpan`, `createImg`, `createA`, `createVideo`, `createCapture`,
+  `createTextarea` — should use the DOM shim's tracked elements; behavior untested.
+- `select()`, `selectAll()`, `removeElements()` — not implemented (item above).
+- `loadXML()` — throws `"loadXML is not defined"` (see Priority 3); needs a `DOMParser` shim.
+- `fullscreen()`, `pixelDensity()` — bind, but fullscreen needs real DOM; pixelDensity
+  partially works.
+- `loadFont()` — documented sync/async inconsistency vs browser callback+preload pattern
+  (accepted tradeoff).
+
+**3. WebGL (version-dependent):**
+- v1: `createCanvas(..., WEBGL)` **throws by design**; `loadShader`/`loadModel` bound but unusable.
+- v2: WebGL 1 works via headless-gl; WebGL 2 unsupported (headless-gl is WebGL-1 only).
+
+**4. Known-unsupported by design (browser APIs):** sound, video/capture
+(`createCapture`, `createVideo`).
+
+**Dominant gap category:** browser-DOM-dependent APIs — intentional headless noops (input,
+sound, save) plus the actionable items: `select`/`selectAll`/`removeElements`, DOM-function
+audit, `loadXML` helpful error, and `save()` loud-failure.
+
 > Accepted tradeoff (not a task): `loadFont()` is synchronous (blocking file I/O) while
 > `loadJSON()` is async. Known inconsistency vs browser p5.js where both share the
 > callback/preload pattern.
 
 ---
 
-## Priority 2 — headless-gl WebGL Memory Leak
-
-**RESOLVED — no reproducible leak in the current architecture.** Measured under node
-(via `scripts/gl-diag.js`, forced GC, RSS + live GL-object counts) across 600 frames:
-
-- **Minimal WebGL** (`box()`): RSS plateaus ~7MB, GL counts flat.
-- **Geometry stress** (`webgl-geometry.js`: per-frame `createGraphics` text → many `ellipse()`):
-  RSS plateaus ~12MB, GL counts flat (no new shader/program/texture/buffer/framebuffer).
-- **Scale path** (output ≠ canvas), both pre- and post-cache: RSS plateaus ~4–11MB, no growth.
-- `loadPixels()`/`readPixelsWebGL` reuse the pixels buffer; `createGraphics` is pooled;
-  geometry is bounded. No path accumulates native memory across frames.
-
-The reported ">600MB" figure predates the split architecture (WEBGL_TASKS/MEMLEAK prototype)
-and is **not reproducible** with the current p5-v2 under node+headless-gl. The `toFrame()`
-read-back-canvas cache (below) remains as a cleanup/optimization, not a leak fix.
-
-**Environment constraint:** headless-gl is a native addon compiled for the Node ABI
-(NODE_MODULE_VERSION 127); bun requires 137, so it **cannot load under bun** — WebGL
-requires plain `node`. The `bun test` suite can't exercise it; `test/webgl.test.js` gates
-WebGL tests on gl availability (run under node, skip under bun).
-
-> Note: under node, p5-v2 fails to load without the `gifenc` `exports` patch (gifenc is a
-> transitive dep of p5-v2; node's ESM resolver can't find its named exports). bun resolves
-> it fine. The patch is now applied and kept (see Priority 3 gifenc item).
-
-**Diagnostic tooling added:** `scripts/gl-diag.js` (`P5B_P5_PATH=p5-v2 node --expose-gc
-scripts/gl-diag.js [sketch] [frames] [every] [outW] [outH]`).
-
-**Already applied:** `toFrame()` caches the WebGL read-back canvas (`_glReadCanvas`,
-recreated only on size change) instead of allocating a fresh node-canvas surface per frame;
-cleared on `remove()`.
-
-**Fix criteria (met):** RSS stable across 100+ frames of a WEBGL sketch — confirmed via
-`scripts/gl-diag.js` for box, geometry, and scale paths.
-
----
-
 ## Priority 3 — Lower Priority / Future Work
-
-### Create `lib` directory
-Only `p5b.js` and `p5b.mjs` should be in the root. Other JS files should move under `lib`. Leave `eslint.config.js` where it is.
-Update all require and import paths to match their new location.
 
 ### Global Alpha Override
 Add an `alpha` property to P5b config (integer in [0, 255]) to apply constant opacity to
@@ -91,7 +91,7 @@ p5-v2 transitively depends on `gifenc` (no `exports` field), so node's ESM resol
 find its named exports (`GIFEncoder`/`quantize`) and p5-v2 fails to load under node.
 **bun resolves gifenc fine** (via the `module` field), so it's a non-issue for the bun-based
 test suite. The `patches/gifenc@1.0.3.patch` + `patchedDependencies` fix is now **applied and
-kept** (needed to run p5-v2 WebGL under node — see Priority 2). Inert under bun.
+kept** (needed to run p5-v2 WebGL under node — see Completed Items). Inert under bun.
 
 ---
 
@@ -115,18 +115,34 @@ Require browser APIs unavailable in Node.js.
 - **v1:** `createCanvas(w, h, WEBGL)` throws by design (`lib/p5b_v1.js`).
 - **v2:** WebGL 1 works headlessly via `headless-gl` (context intercept in `lib/p5b-dom.js`;
   `isP3D` read path in `toFrame()`). WebGL 2 unsupported (headless-gl is WebGL 1 only).
-  Caveat: shader sketches can leak memory — see Priority 2.
+  Caveat: shader sketches can leak memory — see Completed Items.
 
 ---
 
 # Completed Items
 
-- **WebGL memleak investigated & resolved (node)** — measured via `scripts/gl-diag.js`
-  (forced GC, RSS + live GL-object counts) under node + headless-gl + p5-v2 across 600 frames:
-  no path leaks (box, per-frame geometry, and scale paths all plateau; GL counts flat). The
-  ">600MB" figure was stale prototype data, not reproducible now. `toFrame()` caches the
-  read-back canvas (`_glReadCanvas`) as a cleanup. Added `test/webgl.test.js` (gl-gated) +
-  `webgl-box.js`/`webgl-geometry.js` fixtures + gifenc patch (node p5-v2 load).
+- **`lib` directory refactor** — moved `globals.js`, `p5b-base.js`, `p5b_v1.js`, `p5b_v2.js`,
+  `p5b-dom.js` under `lib/` (only `p5b.js`/`p5b.mjs` remain in root; `eslint.config.js` stays).
+  Updated all require/import paths (`p5b.js`, `eslint.config.js`, `test/p5b.test.js`,
+  `scripts/compare-adapters.js`; fixed `lib/p5b-dom.js` package.json require). `package.json`
+  `files` now ships `lib/*` incl. the previously-missing `lib/globals.js`. Verified: lint clean,
+  bun v1/v2 suites, node webgl, `npm pack` dry-run, full `act .`.
+- **WebGL memleak investigated & resolved (node)** — **no reproducible leak** in the current
+  architecture. Measured via `scripts/gl-diag.js` (forced GC, RSS + live GL-object counts)
+  under node + headless-gl + p5-v2 across 600 frames: box (~7MB, flat), geometry stress
+  (~12MB, flat GL counts), and scale path (pre/post-cache, ~4–11MB, no growth) all plateau;
+  `loadPixels`/`readPixelsWebGL` reuse the pixels buffer, `createGraphics` is pooled, geometry
+  is bounded. The ">600MB" figure predates the split architecture and is not reproducible.
+  `toFrame()` caches the read-back canvas (`_glReadCanvas`, recreated only on size change,
+  cleared on `remove()`) as a cleanup/optimization. **Fix criteria met:** RSS stable across
+  100+ frames of a WEBGL sketch, confirmed for box, geometry, and scale paths. Added
+  `test/webgl.test.js` (gl-gated) + `webgl-box.js`/`webgl-geometry.js` fixtures + gifenc patch
+  (node p5-v2 load).
+- **Environment constraint (WebGL):** headless-gl is a native addon compiled for the Node ABI
+  (NODE_MODULE_VERSION 127); bun requires 137, so it cannot load under bun — WebGL requires
+  plain `node`. The `bun test` suite can't exercise it; `test/webgl.test.js` gates WebGL tests
+  on gl availability (run under node, skip under bun). Diagnostic tooling: `scripts/gl-diag.js`
+  (`P5B_P5_PATH=p5-v2 node --expose-gc scripts/gl-diag.js [sketch] [frames] [every] [outW] [outH]`).
 - **`loadBytes()` (v1 + v2)** — implemented via the shared `request(url, "arrayBuffer")`
   helper (new `arrayBuffer` response type). v1 mirrors native p5 v1 (returns `{}` shell with
   `.bytes` as `Uint8Array`, preload-counter-gated); v2 mirrors native p5 v2 (Promise resolving
