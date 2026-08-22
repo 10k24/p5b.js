@@ -348,6 +348,30 @@ class P5bDOM {
 
         const stubStyle = { getPropertyValue: () => "", display: "block", width: "0px", height: "0px" };
 
+        // file:// fetch shim. Node's undici global.fetch rejects file:// ("not implemented"),
+        // while bun supports it — a runtime parity gap. Install this on BOTH win.fetch and
+        // global.fetch so any p5.js fetch-based loader (loadShader/loadModel/loadXML/loadBlob,
+        // plus p5b's own request()) reads local assets via fs under either runtime. Non-file
+        // URLs delegate to the real global fetch.
+        const realFetch = global.fetch;
+        const fetchImpl = (url, init) => {
+            const target = (url instanceof global.Request) ? url.url : url;
+            if (typeof target === "string" && target.startsWith("file://")) {
+                const filePath = target.replace(/^file:\/\//, "");
+                return fs.promises.readFile(filePath).then((data) => ({
+                    ok: true,
+                    status: 200,
+                    url: target,
+                    headers: new Map([["content-type", "application/octet-stream"]]),
+                    arrayBuffer: () => Promise.resolve(data.buffer.slice(data.byteOffset, data.byteOffset + data.byteLength)),
+                    text: () => Promise.resolve(data.toString("utf8")),
+                    json: () => Promise.resolve(JSON.parse(data.toString("utf8"))),
+                    blob: () => Promise.resolve(new Blob([data])),
+                }));
+            }
+            return realFetch(url, init);
+        };
+
         const win = {
             document,
             screen: { width: this.width, height: this.height },
@@ -369,22 +393,7 @@ class P5bDOM {
             Image: P5bImage,
             ImageData: canvas.ImageData,
             performance: { now: () => Date.now() },
-            fetch: (url, init) => {
-                const target = (url instanceof global.Request) ? url.url : url;
-                if (typeof target === "string" && target.startsWith("file://")) {
-                    const filePath = target.replace(/^file:\/\//, "");
-                    return fs.promises.readFile(filePath).then((data) => ({
-                        ok: true,
-                        status: 200,
-                        url: target,
-                        headers: new Map([["content-type", "application/octet-stream"]]),
-                        arrayBuffer: () => Promise.resolve(data.buffer.slice(data.byteOffset, data.byteOffset + data.byteLength)),
-                        text: () => Promise.resolve(data.toString("utf8")),
-                        json: () => Promise.resolve(JSON.parse(data.toString("utf8"))),
-                    }));
-                }
-                return global.fetch(url, init);
-            },
+            fetch: fetchImpl,
         };
 
         // Wrap win in a Proxy so p5.js strands can temporarily inject shader
@@ -407,6 +416,9 @@ class P5bDOM {
         });
         global.document = document;
         global.screen = win.screen;
+        // Install the file:// fetch shim as global.fetch so p5.js's own fetch-based
+        // loaders (and p5b's request()) read local assets under node as well as bun.
+        global.fetch = fetchImpl;
 
         const navDesc = Object.getOwnPropertyDescriptor(global, "navigator");
         if (!navDesc || navDesc.configurable) {

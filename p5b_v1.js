@@ -257,6 +257,23 @@ class P5b extends P5bBase {
                 else console.error(`Failed to load table: ${error.message}`);
             }
         };
+
+        // loadShader/loadModel/loadXML: resolve sketch-relative paths to file:// URLs
+        // (read headlessly by the p5b-dom fetch shim under both bun and node), then
+        // delegate to the native p5 method so behavior matches p5.js exactly.
+        global.loadShader = (vertPath, fragPath, successCallback, failureCallback) =>
+            this._myP5.loadShader(
+                resolveAssetUrl(this.sketchPath, vertPath),
+                resolveAssetUrl(this.sketchPath, fragPath),
+                successCallback,
+                failureCallback
+            );
+
+        global.loadModel = (modelPath, ...rest) =>
+            this._myP5.loadModel(resolveAssetUrl(this.sketchPath, modelPath), ...rest);
+
+        global.loadXML = (filePath, successCallback, errorCallback) =>
+            this._myP5.loadXML(resolveAssetUrl(this.sketchPath, filePath), successCallback, errorCallback);
     }
 
     _validateConfig() {

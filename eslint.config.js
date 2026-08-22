@@ -18,6 +18,8 @@ module.exports = [
                 setImmediate: "readonly",
                 clearImmediate: "readonly",
                 Buffer: "readonly",
+                Blob: "readonly",
+                Request: "readonly",
                 setInterval: "readonly",
                 clearInterval: "readonly",
                 setTimeout: "readonly",
