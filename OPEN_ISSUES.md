@@ -23,31 +23,38 @@ Non-trivial to implement correctly.
 
 ## Priority 2 — headless-gl WebGL Memory Leak
 
-**Symptom:** Node process balloons >600MB rapidly when running a WEBGL sketch with shaders
-(`sketch-earthday.js` with `baseMaterialShader().modify(...)`, `createCanvas(32, 32, WEBGL)`,
-per-frame uniforms).
+**RESOLVED — no reproducible leak in the current architecture.** Measured under node
+(via `scripts/gl-diag.js`, forced GC, RSS + live GL-object counts) across 600 frames:
 
-**Suspected cause:** headless-gl doesn't release GPU/CPU buffers between frames — likely
-shader objects, textures, or framebuffers accumulating without cleanup.
+- **Minimal WebGL** (`box()`): RSS plateaus ~7MB, GL counts flat.
+- **Geometry stress** (`webgl-geometry.js`: per-frame `createGraphics` text → many `ellipse()`):
+  RSS plateaus ~12MB, GL counts flat (no new shader/program/texture/buffer/framebuffer).
+- **Scale path** (output ≠ canvas), both pre- and post-cache: RSS plateaus ~4–11MB, no growth.
+- `loadPixels()`/`readPixelsWebGL` reuse the pixels buffer; `createGraphics` is pooled;
+  geometry is bounded. No path accumulates native memory across frames.
 
-**Reproduction**
-```bash
-cd examples
-node ex-terminal-cli.js sketch-earthday.js
-# watch RSS; should stabilize ~50MB, if climbing past 200MB → leak confirmed
-```
+The reported ">600MB" figure predates the split architecture (WEBGL_TASKS/MEMLEAK prototype)
+and is **not reproducible** with the current p5-v2 under node+headless-gl. The `toFrame()`
+read-back-canvas cache (below) remains as a cleanup/optimization, not a leak fix.
 
-**Investigation steps**
-1. Verify GL resource growth — track `gl.getParameter(gl.CURRENT_PROGRAM)` / RSS before/after `toFrame()`.
-2. Check p5 WebGL renderer cleanup — does p5 call `gl.deleteTexture` / `deleteFramebuffer` / `deleteProgram` / `deleteShader`? (`node_modules/p5/src/webgl/`; v1 vs v2 may differ.)
-3. Check `remove()` teardown — does `this._myP5.remove()` destroy GL resources headlessly?
-4. Explicit cleanup in `toFrame()` — after pixel read: `gl.bindFramebuffer(gl.FRAMEBUFFER, null)`; `gl.bindTexture(gl.TEXTURE_2D, null)`.
-5. GL object pool/cap — if recompilation confirmed, intercept `gl.createProgram`/`createShader` with a capped pool.
-6. headless-gl resize interaction — does `STACKGL_resize_drawingbuffer` on same dims still reallocate?
+**Environment constraint:** headless-gl is a native addon compiled for the Node ABI
+(NODE_MODULE_VERSION 127); bun requires 137, so it **cannot load under bun** — WebGL
+requires plain `node`. The `bun test` suite can't exercise it; `test/webgl.test.js` gates
+WebGL tests on gl availability (run under node, skip under bun).
 
-**Files to modify:** `p5b-base.js` (`toFrame()` read path), `p5b-dom.js` (`getContext` intercept).
+> Note: under node, p5-v2 fails to load without the `gifenc` `exports` patch (gifenc is a
+> transitive dep of p5-v2; node's ESM resolver can't find its named exports). bun resolves
+> it fine. The patch is now applied and kept (see Priority 3 gifenc item).
 
-**Fix criteria:** RSS stable across 100+ frames of `sketch-earthday.js` at `createCanvas(32, 32, WEBGL)`.
+**Diagnostic tooling added:** `scripts/gl-diag.js` (`P5B_P5_PATH=p5-v2 node --expose-gc
+scripts/gl-diag.js [sketch] [frames] [every] [outW] [outH]`).
+
+**Already applied:** `toFrame()` caches the WebGL read-back canvas (`_glReadCanvas`,
+recreated only on size change) instead of allocating a fresh node-canvas surface per frame;
+cleared on `remove()`.
+
+**Fix criteria (met):** RSS stable across 100+ frames of a WEBGL sketch — confirmed via
+`scripts/gl-diag.js` for box, geometry, and scale paths.
 
 ---
 
@@ -79,11 +86,12 @@ Render headless CPU-only 2D (1 sketch at a time, no GPU). Current stack: `node-c
 - **Ruled out:** GPU rasterization (Vello/WebGPU) — GPU→CPU readback (~1–5ms/frame) negates gain for single-buffer output. Worker threads — improve batch throughput, not single-frame latency.
 - **Recommended path:** (1) benchmark node-canvas on representative sketches; (2) swap to Skia, re-benchmark; (3) evaluate vs target FPS; (4) only pursue Tier 2/3 if Skia falls short. At 30fps Cairo handles simple/moderate; 60fps complex hits the wall — Skia gives headroom.
 
-### WebGL gifenc patch (pending verify/close)
-p5-v2 transitively depends on `gifenc` (no `exports` field), which caused
-`ERR_PACKAGE_PATH_NOT_EXPORTED` under `build-readme.js`. Planned `patches/gifenc@1.0.3.patch`
-+ `patchedDependencies` was never created — `build-readme.js` currently runs green under
-p5-v2, likely resolved via bun's loose `exports`. Verify and close.
+### gifenc exports (node-only)
+p5-v2 transitively depends on `gifenc` (no `exports` field), so node's ESM resolver can't
+find its named exports (`GIFEncoder`/`quantize`) and p5-v2 fails to load under node.
+**bun resolves gifenc fine** (via the `module` field), so it's a non-issue for the bun-based
+test suite. The `patches/gifenc@1.0.3.patch` + `patchedDependencies` fix is now **applied and
+kept** (needed to run p5-v2 WebGL under node — see Priority 2). Inert under bun.
 
 ---
 
@@ -113,6 +121,12 @@ Require browser APIs unavailable in Node.js.
 
 # Completed Items
 
+- **WebGL memleak investigated & resolved (node)** — measured via `scripts/gl-diag.js`
+  (forced GC, RSS + live GL-object counts) under node + headless-gl + p5-v2 across 600 frames:
+  no path leaks (box, per-frame geometry, and scale paths all plateau; GL counts flat). The
+  ">600MB" figure was stale prototype data, not reproducible now. `toFrame()` caches the
+  read-back canvas (`_glReadCanvas`) as a cleanup. Added `test/webgl.test.js` (gl-gated) +
+  `webgl-box.js`/`webgl-geometry.js` fixtures + gifenc patch (node p5-v2 load).
 - **`loadBytes()` (v1 + v2)** — implemented via the shared `request(url, "arrayBuffer")`
   helper (new `arrayBuffer` response type). v1 mirrors native p5 v1 (returns `{}` shell with
   `.bytes` as `Uint8Array`, preload-counter-gated); v2 mirrors native p5 v2 (Promise resolving

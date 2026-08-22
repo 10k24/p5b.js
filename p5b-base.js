@@ -124,6 +124,7 @@ class P5bBase extends EventEmitter {
         this._myP5?.remove();
         this._myP5 = null;
         this._destCanvas = null;
+        this._glReadCanvas = null;
         this._dom.clear();
         this._gfxPool.clear();
         this._gfxActive = [];

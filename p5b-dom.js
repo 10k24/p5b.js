@@ -213,6 +213,11 @@ class P5bDOM {
                 children: [],
                 innerHTML: "",
                 textContent: "",
+                remove: () => {
+                    if (el.parentNode && typeof el.parentNode.removeChild === "function") {
+                        el.parentNode.removeChild(el);
+                    }
+                },
             };
             return el;
         };
@@ -228,6 +233,11 @@ class P5bDOM {
             c.dispatchEvent = () => true;
             c.getBoundingClientRect = () => ({ left: 0, top: 0, width: c.width, height: c.height, right: c.width, bottom: c.height });
             c.parentNode = detachedParent;
+            c.remove = () => {
+                if (c.parentNode && typeof c.parentNode.removeChild === "function") {
+                    c.parentNode.removeChild(c);
+                }
+            };
             // parentElement mirrors parentNode so RendererGL's textCanvas insertion
             // (this.canvas.parentElement.insertBefore) always has a valid target.
             Object.defineProperty(c, "parentElement", {

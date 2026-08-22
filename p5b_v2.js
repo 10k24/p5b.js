@@ -23,7 +23,12 @@ class P5b extends P5bBase {
         let srcDrawable;
         if (isP3D) {
             this._myP5.loadPixels();
-            srcDrawable = canvas.createCanvas(srcCanvas.width, srcCanvas.height);
+            // Cache the read-back canvas (recreated only on size change) instead of
+            // allocating a new node-canvas surface every frame.
+            if (!this._glReadCanvas || this._glReadCanvas.width !== srcCanvas.width || this._glReadCanvas.height !== srcCanvas.height) {
+                this._glReadCanvas = canvas.createCanvas(srcCanvas.width, srcCanvas.height);
+            }
+            srcDrawable = this._glReadCanvas;
             srcDrawable.getContext("2d").putImageData(
                 new canvas.ImageData(new Uint8ClampedArray(this._myP5.pixels.buffer), srcCanvas.width, srcCanvas.height),
                 0, 0
