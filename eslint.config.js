@@ -1,5 +1,5 @@
 const js = require("@eslint/js");
-const { mathConstants, mathFunctions, p5Constants } = require("./globals");
+const { mathConstants, mathFunctions, p5Constants } = require("./lib/globals");
 
 // Names of the static globals p5b binds in _bindGlobals() (single source: globals.js)
 const p5StaticGlobals = Object.keys({ ...mathConstants, ...mathFunctions, ...p5Constants });

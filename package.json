@@ -50,11 +50,12 @@
     "type": "commonjs",
     "files": [
         "p5b.js",
-        "p5b-base.js",
-        "p5b_v1.js",
-        "p5b_v2.js",
-        "p5b-dom.js",
         "p5b.mjs",
+        "lib/globals.js",
+        "lib/p5b-base.js",
+        "lib/p5b_v1.js",
+        "lib/p5b_v2.js",
+        "lib/p5b-dom.js",
         "README.md",
         "LICENSE"
     ],

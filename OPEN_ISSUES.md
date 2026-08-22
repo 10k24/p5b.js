@@ -1,6 +1,6 @@
 # Open Issues - p5b.js
 
-## Priority 1 — API Gaps & Semantics
+## Priority 2.5 — API Gaps & Semantics
 
 ### DOM Functions Behavior Unverified
 p5.js may auto-bind DOM functions (`createButton()`, `createCheckbox()`, `createRadio()`,
@@ -112,8 +112,8 @@ Require browser APIs unavailable in Node.js.
 | `createCapture(VIDEO/AUDIO)`, `createVideo()` |
 
 ### 3D/WebGL
-- **v1:** `createCanvas(w, h, WEBGL)` throws by design (`p5b_v1.js`).
-- **v2:** WebGL 1 works headlessly via `headless-gl` (context intercept in `p5b-dom.js`;
+- **v1:** `createCanvas(w, h, WEBGL)` throws by design (`lib/p5b_v1.js`).
+- **v2:** WebGL 1 works headlessly via `headless-gl` (context intercept in `lib/p5b-dom.js`;
   `isP3D` read path in `toFrame()`). WebGL 2 unsupported (headless-gl is WebGL 1 only).
   Caveat: shader sketches can leak memory — see Priority 2.
 
@@ -139,7 +139,7 @@ Require browser APIs unavailable in Node.js.
 - **v1 rejects async lifecycle hooks** — `preload`/`setup`/`draw` declared `async` throw
   `"async/await is not supported in p5.js v1 lifecycle hooks"`. Config-sourced hooks rejected
   synchronously in `_validateConfig()`; sketch-file-sourced hooks detected in `_initSketch()`
-  (emit `"error"` + `stop()`). Uses non-invoking `isAsyncFunction` from `globals.js`. Resolves
+  (emit `"error"` + `stop()`). Uses non-invoking `isAsyncFunction` from `lib/globals.js`. Resolves
   the former "async preload() Semantics (v1)" detection item. Covered by v1-only tests + fixture.
 - **`loadImage()` canvas v3 fixes** — async decode wait + ArrayBuffer slice (shipped 1.2.2).
 - **v1 `loadJSON()` real p5 v1 semantics** — returns data object synchronously; supports
@@ -148,7 +148,7 @@ Require browser APIs unavailable in Node.js.
   and the `loadTable()` TableRow patch; centralized `resolveAssetPath`/`resolveAssetUrl`/
   `splitLines` + standalone `fetchJSON`; extracted base helpers `_readTextLines`,
   `_syncCanvasGlobals`, `_preloadHandle`, `_readFont`, `_removeGraphics`, `_pixels`,
-  `_letterbox`; `noop` moved to `globals.js`.
+  `_letterbox`; `noop` moved to `lib/globals.js`.
 - **async/await contained to v2** — base/dom/v1 are async-keyword-free; `fetchJSON` is a
   standalone `.then()`-based loader; removed `_fetchJson` method and `_wrapSetup` wrapper;
   v1 keeps a sync setup wrapper; dom `_load` rewritten to `.then()` with sync-throw→`onError`.
@@ -157,7 +157,7 @@ Require browser APIs unavailable in Node.js.
 - **Asset-loading dedup (CLEANUP.md)** — URL/asset-path resolution single-sourced; shared
   `file://` response shim confirmed in dom; error semantics normalized (v2 loadJSON try/catch
   removed, v2 rejects, v1 falls through to errorCallback, preload counter always clears).
-- **`noop` dedup** — single definition in `globals.js`, imported by base/adapters/dom.
+- **`noop` dedup** — single definition in `lib/globals.js`, imported by base/adapters/dom.
 - **`_propertySetter` reconciled** — base owns the readonly-prop swallow; adapters supply only
   the p5 instance.
 - **v2 `loadImage()` returns Promise** — `await loadImage()` works in async `setup()`;

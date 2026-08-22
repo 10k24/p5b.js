@@ -1,7 +1,7 @@
 const { describe, it, expect } = require("bun:test");
 const path = require("path");
 const { P5b, P5B_DEFAULTS } = require("../p5b.js");
-const { P5bBase } = require("../p5b-base");
+const { P5bBase } = require("../lib/p5b-base");
 
 const isP5v2 = (process.env.P5B_P5_PATH || "p5") !== "p5";
 

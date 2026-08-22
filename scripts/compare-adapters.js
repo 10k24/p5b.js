@@ -1,15 +1,15 @@
 #!/usr/bin/env node
-// Informational drift report between p5b_v1.js and p5b_v2.js.
+// Informational drift report between lib/p5b_v1.js and lib/p5b_v2.js.
 //
 // Compares the two adapter classes: method order and per-method body equality.
-// Methods defined on P5bBase (p5b-base.js) are excluded from the v1-only report
+// Methods defined on P5bBase (lib/p5b-base.js) are excluded from the v1-only report
 // because both adapters inherit them. Methods whose bodies are 100% identical
-// are flagged as candidates to extract into p5b-base.js (single source of truth).
+// are flagged as candidates to extract into lib/p5b-base.js (single source of truth).
 //
 // Informational only: always exits 0 (no CI gate).
 
 const fs = require("fs");
-const { P5bBase } = require("../p5b-base");
+const { P5bBase } = require("../lib/p5b-base");
 
 const BASE_METHODS = new Set(Object.getOwnPropertyNames(P5bBase.prototype));
 
@@ -17,7 +17,7 @@ const BASE_METHODS = new Set(Object.getOwnPropertyNames(P5bBase.prototype));
 const METHOD_RE = /^ {4}([A-Za-z_$][\w$]*)\s*\([^)]*\)\s*\{/gm;
 
 function parseMethods(file) {
-    // Strip block comments first so commented-out methods (e.g. p5b_v2.js's
+    // Strip block comments first so commented-out methods (e.g. lib/p5b_v2.js's
     // preserved run/stop/remove/clear) aren't mistaken for real definitions.
     const src = fs.readFileSync(file, "utf8").replace(/\/\*[\s\S]*?\*\//g, "");
     const methods = [];
@@ -49,8 +49,8 @@ const fnBody = (name) => {
 const normalize = (body) =>
     body.split("\n").map((l) => l.trim()).filter((l) => l.length > 0).join("\n");
 
-const v1 = parseMethods(require.resolve("../p5b_v1.js"));
-const v2 = parseMethods(require.resolve("../p5b_v2.js"));
+const v1 = parseMethods(require.resolve("../lib/p5b_v1.js"));
+const v2 = parseMethods(require.resolve("../lib/p5b_v2.js"));
 
 const v1Names = v1.map((m) => m.name);
 const v2Names = v2.map((m) => m.name);
@@ -107,7 +107,7 @@ for (const { name, body } of v1) {
     const same = normalize(body) === normalize(other.body);
     if (same) {
         identical.push(name);
-        console.log(`  ${name.padEnd(maxLen)}  identical  [candidate: extract to p5b-base.js]`);
+        console.log(`  ${name.padEnd(maxLen)}  identical  [candidate: extract to lib/p5b-base.js]`);
     } else {
         differs.push(name);
         console.log(`  ${name.padEnd(maxLen)}  DIFFERS`);
@@ -119,7 +119,7 @@ console.log("");
 console.log(`Summary: ${identical.length}/${compared} shared methods are 100% identical, ${differs.length} differ.`);
 if (identical.length) {
     console.log("");
-    console.log("Identical — consider moving into p5b-base.js:");
+    console.log("Identical — consider moving into lib/p5b-base.js:");
     console.log(`  ${identical.join(", ")}`);
 }
 
