@@ -58,7 +58,7 @@ async function setup() {
 - sound
 - third party plugins or extensions
 
-**WebGL:** v1 throws on `createCanvas(w, h, WEBGL)` by design. v2 supports WebGL 1 headlessly via `headless-gl` (WebGL 2 unsupported); shader sketches may leak memory.
+**WebGL:** v1 throws on `createCanvas(w, h, WEBGL)` by design. v2 supports WebGL 1 headlessly via `headless-gl` (WebGL 2 unsupported); shader sketches render headlessly (no reproducible leak — see OPEN_ISSUES).
 
 ## API
 

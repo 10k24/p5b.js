@@ -40,7 +40,7 @@ process.on("SIGINT", () => {
 const p5b = new P5b({
     width: windowWidth,
     height: windowHeight,
-    framerate: 60,
+    fps: 60,
     sketchPath: sketchPath
 });
 

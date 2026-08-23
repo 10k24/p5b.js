@@ -4,7 +4,7 @@ let myFont;
 const ppp = 1;
 
 async function setup() {
-    myFont = await loadFont("/Users/shakeelmohamed/work/git/clocks/sketches/referential_mono.ttf");
+    myFont = await loadFont("../../test/fixtures/font/SourceCodePro-Regular.ttf");
     createCanvas(32, 32, WEBGL);
     textFont(myFont);
     noStroke();

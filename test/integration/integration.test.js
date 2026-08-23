@@ -1048,6 +1048,36 @@ desc("P5b Integration - WEBGL Mode", () => {
     });
 });
 
+desc("P5b Integration - loadXML Error", () => {
+    it("should throw a helpful error when loadXML() is called", (done) => {
+        const p5b = new P5b({
+            width: 16,
+            height: 16,
+            fps: 30,
+            setup: () => {
+                createCanvas(16, 16);
+                loadXML("data.xml");
+            }
+        });
+
+        p5b.on("error", (evt) => {
+            p5b.stop();
+            try {
+                expect(evt.error.message).toContain("loadXML() is not supported in p5b");
+                done();
+            } catch (err) {
+                done(err);
+            }
+        });
+        p5b.on("frame", () => {
+            p5b.stop();
+            done(new Error("expected loadXML() to throw, but a frame was emitted"));
+        });
+
+        p5b.run();
+    });
+});
+
 desc("P5b Integration - Time Functions", () => {
     it("should return current time values matching native Date", (done) => {
         const now = new Date();
