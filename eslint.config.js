@@ -23,6 +23,7 @@ module.exports = [
                 setInterval: "readonly",
                 clearInterval: "readonly",
                 setTimeout: "readonly",
+                clearTimeout: "readonly",
                 createCanvas: "readonly",
                 background: "readonly",
                 createGraphics: "readonly",
