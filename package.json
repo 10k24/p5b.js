@@ -41,7 +41,7 @@
         "lint": "bunx eslint",
         "drift": "node scripts/compare-adapters.js",
         "fix": "bunx eslint --fix",
-        "docs": "node scripts/build-readme.js"
+        "docs": "node scripts/build-docs.js"
     },
     "license": "LGPL-2.1-only",
     "engines": {

@@ -1,11 +1,12 @@
 // Loading sketch from file
-const { P5b } = require("../p5b.js");
+const path = require("path");
+const { P5b } = require("@10k24/p5b");
 
 const p5b = new P5b({
     width: 200,
     height: 200,
     fps: 60,
-    sketchPath: "./examples/sketch.js"
+    sketchPath: path.join(__dirname, "sketch.js")
 });
 
 p5b.on("frame", (buffer) => {

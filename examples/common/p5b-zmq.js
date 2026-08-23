@@ -1,5 +1,3 @@
-const { Request } = require("zeromq");
-
 class P5bZMQ {
     constructor(options = {}) {
         this.host = options.host || "localhost";
@@ -7,6 +5,11 @@ class P5bZMQ {
         this.silent = options.silent || false;
         this.sock = null;
         this.p = options.p || null;
+        this.Request = options.Request;
+
+        if (!this.Request) {
+            throw new Error("P5bZMQ requires the zeromq Request class. Pass it via options.Request.");
+        }
 
         this.metrics = {
             framesDrawn: 0,
@@ -44,7 +47,7 @@ class P5bZMQ {
             console.log(`Connecting to ${zmqDest}`);
         }
 
-        this.sock = new Request();
+        this.sock = new this.Request();
         this.sock.connect(zmqDest);
         
         this.p.run();

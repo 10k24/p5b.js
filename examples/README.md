@@ -1,65 +1,49 @@
 # P5b Examples
 
-Examples demonstrating p5b usage with various backends and integrations.
+Example p5b sketches for p5.js 1.x (`v1/`) and p5.js 2.x (`v2/`).
+
+## Layout
+
+- `v1/` — examples for p5.js 1.x
+- `v2/` — the same examples for p5.js 2.x (async/await, no `preload()`)
+- `common/` — shared utilities used by both example sets
 
 ## Setup
 
-Each example has its own dependencies. Install them in this directory:
+Each version directory is self-contained. Install its dependencies and run from that
+directory:
 
 ```bash
-cd examples
-bun install
+cd v1 && bun install   # p5.js 1.x
+cd v2 && bun install   # p5.js 2.x
 ```
 
-## ZMQ LED Matrix Example
+`zeromq` is an **optional** dependency of each version set — only `ex-p5b-zmq.js` needs it.
+If it wasn't installed, run `npm install --include=optional` in the relevant directory.
 
-Streams p5.js sketch output to a ZMQ-based LED matrix broker.
+## v1 — p5.js 1.x
 
-**Usage:**
+- `ex-inline.js` — Inline `setup()`/`draw()` callbacks
+- `ex-file-based.js` — Load a sketch from a `.js` file
+- `ex-p5b-zmq.js` — Stream frames over ZeroMQ
+- `ex-terminal-cli.js` — Render a sketch in the terminal
 
-```bash
-bun run zmq [host] [port]
-```
+Sketches:
 
-**Default:**
-- Host: `localhost`
-- Port: `60001`
+- `sketch.js` — Red rectangle on a gray canvas
+- `sketch-rings.js` — Animated concentric rings
 
-**Example:**
+## v2 — p5.js 2.x
 
-```bash
-bun run zmq 192.168.1.100 5555
-```
+- `ex-inline.js` — Inline callbacks with async `setup()`
+- `ex-file-based.js` — Load a sketch from a `.js` file
+- `ex-p5b-zmq.js` — Stream frames over ZeroMQ
+- `ex-terminal-cli.js` — Render a sketch in the terminal
 
-The sketch draws an animated checkerboard pattern that scales from 400x400 (draw resolution) to 32x32 (matrix size). Each frame is sent as a 4-byte RGBA buffer via ZMQ Request socket.
+Sketches:
 
-**Protocol:**
-- Sends: `Uint8Array` (32×32×4 bytes = 4096 bytes of RGBA pixel data)
-- Receives: Single byte acknowledgment from broker
-- Frame rate: 10 fps
-
-Press `Ctrl+C` to close the connection and exit.
-
-## Terminal Renderer (CLI) Examples
-
-Renders a p5.js sketch from a file in the terminal using truecolor ANSI half-block characters.
-
-**Usage:**
-
-```bash
-node ex-terminal-cli.js <sketch-path>
-```
-
-**Example:**
-
-```bash
-node ex-terminal-cli.js sketch-rings.js
-```
-
-**Requirements:**
-- Truecolor terminal (Ghostty, Kitty, iTerm2, WezTerm, etc.)
-- A sketch file that defines `setup()` and `draw()` functions
-
-**Included Sketch:** `sketch-rings.js` - Animated concentric rings pattern
-
-Press `Ctrl+C` to exit.
+- `sketch.js` — Red rectangle on a gray canvas
+- `sketch-rings.js` — Animated concentric rings
+- `sketch-world.js` — WebGL shader globe
+- `sketch-earthday.js` — WebGL earth-day text
+- `sketch-earthday-text.js` — WebGL earth-day text (variation)

@@ -30,8 +30,9 @@ npm install @10k24/p5b
 
 **Inline mode** — define setup/draw callbacks directly:
 
-```javascript
-const { P5b } = require("@10k24/p5b");
+<table>
+<tr><th>v1</th><th>v2</th></tr>
+<tr><td><pre><code class="language-javascript">const { P5b } = require("@10k24/p5b");
 
 const p5b = new P5b({
     width: 400,
@@ -45,17 +46,36 @@ const p5b = new P5b({
     }
 });
 
-p5b.on("frame", (buffer) => {
+p5b.on("frame", (buffer) =&gt; {
     // Process frame buffer
 });
 
-p5b.run();
-```
+p5b.run();</code></pre></td><td><pre><code class="language-javascript">const { P5b } = require("@10k24/p5b");
+
+const p5b = new P5b({
+    width: 400,
+    height: 400,
+    fps: 60,
+    async setup() {
+    // p5 setup code (async supported in v2)
+    },
+    draw() {
+    // p5 draw code
+    }
+});
+
+p5b.on("frame", (buffer) =&gt; {
+    // Process frame buffer
+});
+
+p5b.run();</code></pre></td></tr>
+</table>
 
 **Sketch file mode** — load a `.js` sketch file (defines `setup`/`draw` as globals):
 
-```javascript
-const { P5b } = require("@10k24/p5b");
+<table>
+<tr><th>v1</th><th>v2</th></tr>
+<tr><td><pre><code class="language-javascript">const { P5b } = require("@10k24/p5b");
 
 const p5b = new P5b({
     width: 400,
@@ -64,12 +84,25 @@ const p5b = new P5b({
     sketchPath: "./my-sketch.js"
 });
 
-p5b.on("frame", (buffer) => {
+p5b.on("frame", (buffer) =&gt; {
     // Process frame buffer
 });
 
-p5b.run();
-```
+p5b.run();</code></pre></td><td><pre><code class="language-javascript">const { P5b } = require("@10k24/p5b");
+
+const p5b = new P5b({
+    width: 400,
+    height: 400,
+    fps: 60,
+    sketchPath: "./my-sketch.js"
+});
+
+p5b.on("frame", (buffer) =&gt; {
+    // Process frame buffer
+});
+
+p5b.run();</code></pre></td></tr>
+</table>
 
 ## API
 
@@ -98,25 +131,28 @@ Creates a new P5b instance with the given options.
 
 Start or resume sketch execution. On first call, initializes the p5 instance. After `stop()`, resumes the draw loop. Throws if called after `remove()`.
 
-```javascript
-p5b.run();
-```
+<table>
+<tr><th>v1</th><th>v2</th></tr>
+<tr><td><pre><code class="language-javascript">p5b.run();</code></pre></td><td><pre><code class="language-javascript">p5b.run();</code></pre></td></tr>
+</table>
 
 #### `stop()`
 
 Pause sketch execution. The p5 instance and canvas are kept alive. Call `run()` to resume.
 
-```javascript
-p5b.stop();
-```
+<table>
+<tr><th>v1</th><th>v2</th></tr>
+<tr><td><pre><code class="language-javascript">p5b.stop();</code></pre></td><td><pre><code class="language-javascript">p5b.stop();</code></pre></td></tr>
+</table>
 
 #### `remove()`
 
 Fully tear down the p5 instance and free all resources. Calling `run()` after `remove()` throws.
 
-```javascript
-p5b.remove(); // or p5b.clear()
-```
+<table>
+<tr><th>v1</th><th>v2</th></tr>
+<tr><td><pre><code class="language-javascript">p5b.remove(); // or p5b.clear()</code></pre></td><td><pre><code class="language-javascript">p5b.remove(); // or p5b.clear()</code></pre></td></tr>
+</table>
 
 `clear()` is an alias for `remove()`.
 
@@ -124,10 +160,12 @@ p5b.remove(); // or p5b.clear()
 
 Get current canvas as a Uint8Array RGBA buffer.
 
-```javascript
-const buffer = p5b.toFrame();
-// buffer.length === width * height * 4
-```
+<table>
+<tr><th>v1</th><th>v2</th></tr>
+<tr><td><pre><code class="language-javascript">const buffer = p5b.toFrame();
+// buffer.length === width * height * 4</code></pre></td><td><pre><code class="language-javascript">const buffer = p5b.toFrame();
+// buffer.length === width * height * 4</code></pre></td></tr>
+</table>
 
 Throws if canvas not initialized (call `run()` first).
 
@@ -135,9 +173,10 @@ Throws if canvas not initialized (call `run()` first).
 
 Get execution metrics.
 
-```javascript
-const { framesDrawn, errors } = p5b.getMetrics();
-```
+<table>
+<tr><th>v1</th><th>v2</th></tr>
+<tr><td><pre><code class="language-javascript">const { framesDrawn, errors } = p5b.getMetrics();</code></pre></td><td><pre><code class="language-javascript">const { framesDrawn, errors } = p5b.getMetrics();</code></pre></td></tr>
+</table>
 
 Returns: `{ framesDrawn: number, errors: number }`
 
@@ -147,32 +186,51 @@ Returns: `{ framesDrawn: number, errors: number }`
 
 Emitted after each draw cycle with the rendered frame buffer.
 
-```javascript
-p5b.on("frame", (buffer) => {
+<table>
+<tr><th>v1</th><th>v2</th></tr>
+<tr><td><pre><code class="language-javascript">p5b.on("frame", (buffer) =&gt; {
     // buffer is Uint8Array(width * height * 4)
     // RGBA format: [R0, G0, B0, A0, R1, G1, B1, A1, ...]
-});
-```
+});</code></pre></td><td><pre><code class="language-javascript">p5b.on("frame", (buffer) =&gt; {
+    // buffer is Uint8Array(width * height * 4)
+    // RGBA format: [R0, G0, B0, A0, R1, G1, B1, A1, ...]
+});</code></pre></td></tr>
+</table>
 
 #### `'error'` event
 
 Emitted when an error occurs in preload, setup, or draw.
 
-```javascript
-p5b.on("error", ({ phase, error }) => {
+<table>
+<tr><th>v1</th><th>v2</th></tr>
+<tr><td><pre><code class="language-javascript">p5b.on("error", ({ phase, error }) =&gt; {
     console.error(`Error in ${phase}:`, error);
-});
-```
+});</code></pre></td><td><pre><code class="language-javascript">p5b.on("error", ({ phase, error }) =&gt; {
+    console.error(`Error in ${phase}:`, error);
+});</code></pre></td></tr>
+</table>
 
 ## Examples
 
-See [examples/](examples/) for runnable examples:
+Two example sets, one per supported p5.js version, plus shared utilities:
 
-- [examples/ex-file-based.js](examples/ex-file-based.js) — Loading sketch from file
-- [examples/ex-inline.js](examples/ex-inline.js) — Using setup/draw callbacks
-- [examples/ex-p5b-zmq.js](examples/ex-p5b-zmq.js) — ZeroMQ frame transport
-- [examples/ex-terminal-cli.js](examples/ex-terminal-cli.js) — Render a p5.js sketch in the terminal using truecolor ANSI half-block characters.
+- [examples/v1/](examples/v1/) — p5.js 1.x examples
+- [examples/v2/](examples/v2/) — p5.js 2.x examples (async/await, no `preload()`)
+- [examples/common/](examples/common/) — shared utilities for both sets
 
+### v1 — p5.js 1.x
+
+- [examples/v1/ex-file-based.js](examples/v1/ex-file-based.js) — Loading sketch from file
+- [examples/v1/ex-inline.js](examples/v1/ex-inline.js) — Using setup/draw callbacks
+- [examples/v1/ex-p5b-zmq.js](examples/v1/ex-p5b-zmq.js) — Stream p5.js sketch output to a ZMQ-based LED matrix broker.
+- [examples/v1/ex-terminal-cli.js](examples/v1/ex-terminal-cli.js) — Render a p5.js sketch in the terminal using truecolor ANSI half-block characters.
+
+### v2 — p5.js 2.x
+
+- [examples/v2/ex-file-based.js](examples/v2/ex-file-based.js) — Loading sketch from file
+- [examples/v2/ex-inline.js](examples/v2/ex-inline.js) — Using setup/draw callbacks (async setup)
+- [examples/v2/ex-p5b-zmq.js](examples/v2/ex-p5b-zmq.js) — Stream p5.js sketch output to a ZMQ-based LED matrix broker.
+- [examples/v2/ex-terminal-cli.js](examples/v2/ex-terminal-cli.js) — Render a p5.js sketch in the terminal using truecolor ANSI half-block characters.
 
 ## Buffer Format
 
@@ -188,11 +246,14 @@ Frames are emitted as `Uint8Array` in RGBA format with automatic scaling to matc
 
 Example: read pixel at (x, y):
 
-```javascript
-const x = 10, y = 20;
+<table>
+<tr><th>v1</th><th>v2</th></tr>
+<tr><td><pre><code class="language-javascript">const x = 10, y = 20;
 const idx = (y * width + x) * 4;
-const [r, g, b, a] = buffer.slice(idx, idx + 4);
-```
+const [r, g, b, a] = buffer.slice(idx, idx + 4);</code></pre></td><td><pre><code class="language-javascript">const x = 10, y = 20;
+const idx = (y * width + x) * 4;
+const [r, g, b, a] = buffer.slice(idx, idx + 4);</code></pre></td></tr>
+</table>
 
 ## Performance
 
@@ -237,7 +298,7 @@ This scales the canvas to the largest integer multiple that fits the window — 
 
 ## Transport Layer
 
-For streaming frames to external systems, see [examples/ex-p5b-zmq.js](examples/ex-p5b-zmq.js) for a ZeroMQ adapter reference.
+For streaming frames to external systems, see [examples/v1/ex-p5b-zmq.js](examples/v1/ex-p5b-zmq.js) for a ZeroMQ adapter reference.
 
 ## p5.js Version Selection
 

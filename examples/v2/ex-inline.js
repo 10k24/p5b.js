@@ -1,11 +1,12 @@
-// Using setup/draw callbacks
-const { P5b } = require("../p5b.js");
+// Using setup/draw callbacks (async setup)
+// p5.js 2.x removed the preload() lifecycle, so async work happens in an async setup().
+const { P5b } = require("@10k24/p5b");
 
 const p5b = new P5b({
     width: 200,
     height: 200,
     fps: 60,
-    setup() {
+    async setup() {
         createCanvas(200, 200);
         background(240);
     },

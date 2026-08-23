@@ -1,0 +1,13 @@
+{
+    "name": "{{=it.name}}",
+    "version": "{{=it.version}}",
+    "description": "{{=it.description}}",
+    "private": true,
+    "type": "commonjs",
+    "dependencies": {{{~it.deps :dep}}
+        "{{=dep.key}}": "{{=dep.value}}"{{=dep.comma}}{{~}}
+    },
+    "optionalDependencies": {{{~it.optionalDeps :dep}}
+        "{{=dep.key}}": "{{=dep.value}}"{{=dep.comma}}{{~}}
+    }
+}

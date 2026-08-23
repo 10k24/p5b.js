@@ -1,0 +1,14 @@
+{
+    "name": "@10k24/p5b-examples-v1",
+    "version": "1.2.2",
+    "description": "p5b examples for p5.js 1.x",
+    "private": true,
+    "type": "commonjs",
+    "dependencies": {
+        "@10k24/p5b": "1.2.2",
+        "p5": "^1.11.0"
+    },
+    "optionalDependencies": {
+        "zeromq": "^6.0.0"
+    }
+}

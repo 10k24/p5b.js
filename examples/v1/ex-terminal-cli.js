@@ -1,6 +1,19 @@
 // Render a p5.js sketch in the terminal using truecolor ANSI half-block characters.
-// Works in any truecolor terminal (Ghostty, Kitty, iTerm2, WezTerm, etc.)
-const { P5b } = require("../p5b.js");
+//
+// Usage:
+//   node ex-terminal-cli.js <sketch-path>
+//
+// Example:
+//   node ex-terminal-cli.js sketch-rings.js
+//
+// Requirements:
+//   - Truecolor terminal (Ghostty, Kitty, iTerm2, WezTerm, etc.)
+//   - A sketch file that defines setup() and draw() functions
+//
+// Included Sketch: sketch-rings.js — Animated concentric rings pattern.
+//
+// Press Ctrl+C to exit.
+const { P5b } = require("@10k24/p5b");
 const sketchPath = process.argv[2];
 
 if (!sketchPath) {
@@ -11,7 +24,7 @@ if (!sketchPath) {
 // Set sketch size based on terminal dimensions
 // Each character cell = 1 col × 2 rows of pixels, so windowHeight must be even.
 // Reserve 1 row to prevent scroll (which breaks cursor-home positioning).
-// 
+//
 // Note: we must bootstrap these values here, which typically
 // are defined in the p5b wrapped version of createCanvas(w, h)
 global.windowWidth = process.stdout.columns || 80;
