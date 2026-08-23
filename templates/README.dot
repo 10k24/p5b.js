@@ -2,24 +2,6 @@
 
 Render p5.js sketches to RGBA pixel buffers in Node.js.
 
-## p5.js Compatibility
-
-| p5.js version | Status |
-|---|---|
-| v1.9+ | Fully supported |
-| v2.x | Supported (see v2 notes below) |
-
-**p5.js v2 headless shims** — p5b provides browser-API compatibility so p5 v2 runs headlessly:
-- `Path2D` — p5 v2 renders custom shapes via the browser-only `Path2D`; p5b polyfills it and replays path commands through node-canvas
-- `colorMode(HSB)` — p5 v2 emits CSS Color 4 percentage `rgb()` strings that node-canvas rejects; p5b normalizes them at the canvas boundary
-
-**Unsupported in all versions:**
-- video
-- sound
-- third party plugins or extensions
-
-**WebGL:** v1 throws on `createCanvas(w, h, WEBGL)` by design. v2 supports WebGL 1 headlessly via `headless-gl` (WebGL 2 unsupported); shader sketches may leak memory.
-
 ## Installation
 
 ```bash
@@ -41,6 +23,42 @@ npm install @10k24/p5b
 <tr><th>v1</th><th>v2</th></tr>
 <tr><td><pre><code class="language-javascript">{{=it.stubs.v1['constructor-sketchpath']}}</code></pre></td><td><pre><code class="language-javascript">{{=it.stubs.v2['constructor-sketchpath']}}</code></pre></td></tr>
 </table>
+
+## p5.js Version Selection
+
+By default p5b loads whichever `p5` package is installed. Set `P5B_P5_PATH` to use a different package name:
+
+```bash
+P5B_P5_PATH=p5-v2 node my-sketch.js
+```
+
+**p5.js v2 async setup:** p5 v2 removed the `preload()` lifecycle. p5b **rejects** a `preload` config under v2 (the `preload` option is v1-only) — for v2 sketches, use `async setup()` directly:
+
+```javascript
+async function setup() {
+    const img = await loadImage("photo.png");
+    createCanvas(400, 400);
+    image(img, 0, 0);
+}
+```
+
+## p5.js Compatibility
+
+| p5.js version | Status |
+|---|---|
+| v1.9+ | Fully supported |
+| v2.x | Supported (see v2 notes below) |
+
+**p5.js v2 headless shims** — p5b provides browser-API compatibility so p5 v2 runs headlessly:
+- `Path2D` — p5 v2 renders custom shapes via the browser-only `Path2D`; p5b polyfills it and replays path commands through node-canvas
+- `colorMode(HSB)` — p5 v2 emits CSS Color 4 percentage `rgb()` strings that node-canvas rejects; p5b normalizes them at the canvas boundary
+
+**Unsupported in all versions:**
+- video
+- sound
+- third party plugins or extensions
+
+**WebGL:** v1 throws on `createCanvas(w, h, WEBGL)` by design. v2 supports WebGL 1 headlessly via `headless-gl` (WebGL 2 unsupported); shader sketches may leak memory.
 
 ## API
 
@@ -210,24 +228,6 @@ This scales the canvas to the largest integer multiple that fits the window — 
 ## Transport Layer
 
 For streaming frames to external systems, see [examples/v1/ex-p5b-zmq.js](examples/v1/ex-p5b-zmq.js) for a ZeroMQ adapter reference.
-
-## p5.js Version Selection
-
-By default p5b loads whichever `p5` package is installed. Set `P5B_P5_PATH` to use a different package name:
-
-```bash
-P5B_P5_PATH=p5-v2 node my-sketch.js
-```
-
-**p5.js v2 async setup:** p5 v2 removed the `preload()` lifecycle. p5b **rejects** a `preload` config under v2 (the `preload` option is v1-only) — for v2 sketches, use `async setup()` directly:
-
-```javascript
-async function setup() {
-    const img = await loadImage("photo.png");
-    createCanvas(400, 400);
-    image(img, 0, 0);
-}
-```
 
 ## Environment
 
