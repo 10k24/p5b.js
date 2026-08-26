@@ -242,6 +242,13 @@ Two example sets, one per supported p5.js version, plus shared utilities:
 - [examples/v1/ex-inline.js](examples/v1/ex-inline.js) — Using setup/draw callbacks
 - [examples/v1/ex-p5b-zmq.js](examples/v1/ex-p5b-zmq.js) — Stream p5.js sketch output to a ZMQ-based LED matrix broker.
 - [examples/v1/ex-terminal-cli.js](examples/v1/ex-terminal-cli.js) — Render a p5.js sketch in the terminal using truecolor ANSI half-block characters.
+- [examples/v1/sketch-color.js](examples/v1/sketch-color.js) — Color modes (HSB) and lerpColor
+- [examples/v1/sketch-curves.js](examples/v1/sketch-curves.js) — Curves: bezier and curve
+- [examples/v1/sketch-noise.js](examples/v1/sketch-noise.js) — Generative noise / random field
+- [examples/v1/sketch-primitives.js](examples/v1/sketch-primitives.js) — Drawing primitives: triangle, quad, arc, line, point, rect, ellipse
+- [examples/v1/sketch-rings.js](examples/v1/sketch-rings.js) — Concentric rings
+- [examples/v1/sketch-text.js](examples/v1/sketch-text.js) — Text rendering: text, textSize, textAlign, textStyle, textWidth
+- [examples/v1/sketch-transform.js](examples/v1/sketch-transform.js) — Transformations: push/pop, translate, rotate, scale
 
 ### v2 — p5.js 2.x
 
@@ -249,6 +256,14 @@ Two example sets, one per supported p5.js version, plus shared utilities:
 - [examples/v2/ex-inline.js](examples/v2/ex-inline.js) — Using setup/draw callbacks (async setup)
 - [examples/v2/ex-p5b-zmq.js](examples/v2/ex-p5b-zmq.js) — Stream p5.js sketch output to a ZMQ-based LED matrix broker.
 - [examples/v2/ex-terminal-cli.js](examples/v2/ex-terminal-cli.js) — Render a p5.js sketch in the terminal using truecolor ANSI half-block characters.
+- [examples/v2/sketch-color.js](examples/v2/sketch-color.js) — Color modes (HSB) and lerpColor
+- [examples/v2/sketch-curves.js](examples/v2/sketch-curves.js) — Curves: bezier and spline (p5 v2 renamed curve() to spline())
+- [examples/v2/sketch-noise.js](examples/v2/sketch-noise.js) — Generative noise / random field
+- [examples/v2/sketch-primitives.js](examples/v2/sketch-primitives.js) — Drawing primitives: triangle, quad, arc, line, point, rect, ellipse
+- [examples/v2/sketch-rings.js](examples/v2/sketch-rings.js) — Concentric rings
+- [examples/v2/sketch-text.js](examples/v2/sketch-text.js) — Text rendering: text, textSize, textAlign, textStyle, textWidth
+- [examples/v2/sketch-transform.js](examples/v2/sketch-transform.js) — Transformations: push/pop, translate, rotate, scale
+- [examples/v2/sketch-world.js](examples/v2/sketch-world.js) — WebGL shader globe
 
 ## Buffer Format
 

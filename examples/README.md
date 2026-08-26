@@ -32,6 +32,12 @@ Sketches:
 
 - `sketch.js` — Red rectangle on a gray canvas
 - `sketch-rings.js` — Animated concentric rings
+- `sketch-color.js` — Color modes (HSB) and `lerpColor()`
+- `sketch-primitives.js` — Drawing primitives (triangle, quad, arc, line, point, rect, ellipse)
+- `sketch-transform.js` — Transformations (`push`/`pop`, `translate`, `rotate`)
+- `sketch-curves.js` — Curves (`bezier`, `curve`)
+- `sketch-text.js` — Text rendering (`text`, `textSize`, `textAlign`, `textStyle`, `textWidth`)
+- `sketch-noise.js` — Generative noise/random field
 
 ## v2 — p5.js 2.x
 
@@ -44,6 +50,10 @@ Sketches:
 
 - `sketch.js` — Red rectangle on a gray canvas
 - `sketch-rings.js` — Animated concentric rings
+- `sketch-color.js` — Color modes (HSB) and `lerpColor()`
+- `sketch-primitives.js` — Drawing primitives (triangle, quad, arc, line, point, rect, ellipse)
+- `sketch-transform.js` — Transformations (`push`/`pop`, `translate`, `rotate`)
+- `sketch-curves.js` — Curves (`bezier`, `spline` — p5 v2 renamed `curve()` to `spline()`)
+- `sketch-text.js` — Text rendering (`text`, `textSize`, `textAlign`, `textStyle`, `textWidth`)
+- `sketch-noise.js` — Generative noise/random field
 - `sketch-world.js` — WebGL shader globe
-- `sketch-earthday.js` — WebGL earth-day text
-- `sketch-earthday-text.js` — WebGL earth-day text (variation)

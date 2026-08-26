@@ -117,14 +117,15 @@ function renderAll() {
     });
 
     // Load examples with descriptions from first-line comments. Examples live in
-    // version-specific subdirectories (examples/v1, examples/v2).
+    // version-specific subdirectories (examples/v1, examples/v2). Both runner scripts
+    // (ex-*.js) and sketches (sketch-*.js) are listed.
     const examplesDir = path.join(process.cwd(), "examples");
 
     const scanExamples = (dir) => {
         const fullDir = path.join(examplesDir, dir);
         const items = [];
         fs.readdirSync(fullDir)
-            .filter(file => file.startsWith("ex-") && file.endsWith(".js"))
+            .filter(file => /^(ex-|sketch-).*\.js$/.test(file))
             .sort()
             .forEach(file => {
                 const filePath = path.join(fullDir, file);

@@ -104,9 +104,6 @@ manual human review of the generated prose for accuracy, tone, and completeness 
 release — including the compatibility claims (e.g. the `v1.9+` cutoff), the WebGL caveat, the
 async-setup guidance, and the example descriptions. Review the template, not just the output.
 
-### Consider removing earthday examples
-Either way, they need a thorough review and manual testing.
-
 ---
 
 ## Known Unsupported (By Design)

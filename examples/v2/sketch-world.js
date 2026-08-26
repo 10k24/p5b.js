@@ -1,3 +1,5 @@
+// WebGL shader globe
+
 let globeShader;
 
 function setup() {
