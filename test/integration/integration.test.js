@@ -3076,3 +3076,359 @@ desc("P5b Integration - toFrame loadPixels happy path", () => {
         p5b.run();
     });
 });
+
+desc("P5b Integration - Color object & accessors", () => {
+    it("color() object exposes red/green/blue/alpha accessors", (done) => {
+        let r, g, b, a;
+        const p5b = new P5b({
+            width: 16, height: 16, fps: 30,
+            setup: () => { createCanvas(16, 16); },
+            draw: () => {
+                const c = color(120, 200, 30, 180);
+                r = red(c); g = green(c); b = blue(c); a = alpha(c);
+                noLoop();
+            }
+        });
+        p5b.on("error", (e) => { p5b.stop(); done(e.error); });
+        p5b.on("frame", () => {
+            expect(r).toBe(120);
+            expect(g).toBe(200);
+            expect(b).toBe(30);
+            expect(a).toBe(180);
+            p5b.stop(); done();
+        });
+        p5b.run();
+    });
+
+    it("color() HSB accessors return hue/saturation/brightness", (done) => {
+        let h, s, b;
+        const p5b = new P5b({
+            width: 16, height: 16, fps: 30,
+            setup: () => { createCanvas(16, 16); },
+            draw: () => {
+                colorMode(HSB, 360, 100, 100);
+                const c = color(120, 50, 80);
+                h = hue(c); s = saturation(c); b = brightness(c);
+                noLoop();
+            }
+        });
+        p5b.on("error", (e) => { p5b.stop(); done(e.error); });
+        p5b.on("frame", () => {
+            expect(h).toBeCloseTo(120, 5);
+            expect(s).toBeCloseTo(50, 5);
+            expect(b).toBeCloseTo(80, 5);
+            p5b.stop(); done();
+        });
+        p5b.run();
+    });
+
+    it("lerpColor() interpolates between two colors", (done) => {
+        let mid;
+        const p5b = new P5b({
+            width: 16, height: 16, fps: 30,
+            setup: () => { createCanvas(16, 16); },
+            draw: () => {
+                mid = lerpColor(color(0, 0, 0), color(255, 255, 255), 0.5);
+                noLoop();
+            }
+        });
+        p5b.on("error", (e) => { p5b.stop(); done(e.error); });
+        p5b.on("frame", () => {
+            expect(red(mid)).toBeCloseTo(127.5, 1);
+            expect(green(mid)).toBeCloseTo(127.5, 1);
+            expect(blue(mid)).toBeCloseTo(127.5, 1);
+            p5b.stop(); done();
+        });
+        p5b.run();
+    });
+});
+
+desc("P5b Integration - Curves & vertices", () => {
+    const darkPixels = (buf) => {
+        let dark = 0;
+        for (let i = 0; i < buf.length; i += 4) {
+            if (buf[i] < 100 && buf[i + 1] < 100 && buf[i + 2] < 100) dark++;
+        }
+        return dark;
+    };
+
+    it("bezier() renders (exercises the v2 Path2D bezier replay)", (done) => {
+        const p5b = new P5b({
+            width: 64, height: 64, fps: 30,
+            setup: () => { createCanvas(64, 64); },
+            draw: () => {
+                background(255); stroke(0); strokeWeight(2); noFill();
+                bezier(10, 50, 20, 10, 44, 10, 54, 50);
+                noLoop();
+            }
+        });
+        p5b.on("error", (e) => { p5b.stop(); done(e.error); });
+        p5b.on("frame", (buf) => {
+            expect(darkPixels(buf)).toBeGreaterThan(0);
+            p5b.stop(); done();
+        });
+        p5b.run();
+    });
+
+    it.skipIf(isP5v2)("curve() renders (v1)", (done) => {
+        const p5b = new P5b({
+            width: 64, height: 64, fps: 30,
+            setup: () => { createCanvas(64, 64); },
+            draw: () => {
+                background(255); stroke(0); strokeWeight(2); noFill();
+                curve(0, 64, 10, 50, 54, 50, 64, 0);
+                noLoop();
+            }
+        });
+        p5b.on("error", (e) => { p5b.stop(); done(e.error); });
+        p5b.on("frame", (buf) => {
+            expect(darkPixels(buf)).toBeGreaterThan(0);
+            p5b.stop(); done();
+        });
+        p5b.run();
+    });
+
+    it.skipIf(!isP5v2)("spline() renders (v2 — curve renamed to spline)", (done) => {
+        const p5b = new P5b({
+            width: 64, height: 64, fps: 30,
+            setup: () => { createCanvas(64, 64); },
+            draw: () => {
+                background(255); stroke(0); strokeWeight(2); noFill();
+                spline(0, 64, 10, 50, 54, 50, 64, 0);
+                noLoop();
+            }
+        });
+        p5b.on("error", (e) => { p5b.stop(); done(e.error); });
+        p5b.on("frame", (buf) => {
+            expect(darkPixels(buf)).toBeGreaterThan(0);
+            p5b.stop(); done();
+        });
+        p5b.run();
+    });
+
+    // v1 only: v2's bezierVertex fails inside p5's own shape visitor (see OPEN_ISSUES).
+    it.skipIf(isP5v2)("bezierVertex() renders within beginShape (v1)", (done) => {
+        const p5b = new P5b({
+            width: 64, height: 64, fps: 30,
+            setup: () => { createCanvas(64, 64); },
+            draw: () => {
+                background(255); stroke(0); strokeWeight(2); noFill();
+                beginShape();
+                vertex(8, 50);
+                bezierVertex(20, 10, 44, 10, 56, 50);
+                endShape();
+                noLoop();
+            }
+        });
+        p5b.on("error", (e) => { p5b.stop(); done(e.error); });
+        p5b.on("frame", (buf) => {
+            expect(darkPixels(buf)).toBeGreaterThan(0);
+            p5b.stop(); done();
+        });
+        p5b.run();
+    });
+
+    it.skipIf(isP5v2)("curveVertex() and quadraticVertex() render within beginShape (v1)", (done) => {
+        const p5b = new P5b({
+            width: 64, height: 64, fps: 30,
+            setup: () => { createCanvas(64, 64); },
+            draw: () => {
+                background(255); stroke(0); strokeWeight(2); noFill();
+                beginShape();
+                vertex(8, 50);
+                curveVertex(20, 10); curveVertex(44, 10); curveVertex(56, 50);
+                endShape();
+                beginShape();
+                vertex(8, 50);
+                quadraticVertex(32, 10, 56, 50);
+                endShape();
+                noLoop();
+            }
+        });
+        p5b.on("error", (e) => { p5b.stop(); done(e.error); });
+        p5b.on("frame", (buf) => {
+            expect(darkPixels(buf)).toBeGreaterThan(0);
+            p5b.stop(); done();
+        });
+        p5b.run();
+    });
+
+    it.skipIf(!isP5v2)("splineVertex() renders within beginShape (v2)", (done) => {
+        const p5b = new P5b({
+            width: 64, height: 64, fps: 30,
+            setup: () => { createCanvas(64, 64); },
+            draw: () => {
+                background(255); stroke(0); strokeWeight(2); noFill();
+                beginShape();
+                vertex(8, 50);
+                splineVertex(20, 10); splineVertex(44, 10); splineVertex(56, 50);
+                endShape();
+                noLoop();
+            }
+        });
+        p5b.on("error", (e) => { p5b.stop(); done(e.error); });
+        p5b.on("frame", (buf) => {
+            expect(darkPixels(buf)).toBeGreaterThan(0);
+            p5b.stop(); done();
+        });
+        p5b.run();
+    });
+
+    it("bezierPoint() evaluates a point on the curve", (done) => {
+        let pt;
+        const p5b = new P5b({
+            width: 16, height: 16, fps: 30,
+            setup: () => { createCanvas(16, 16); },
+            draw: () => {
+                // Symmetric control points → midpoint lands at 100.
+                pt = bezierPoint(0, 100, 100, 200, 0.5);
+                noLoop();
+            }
+        });
+        p5b.on("error", (e) => { p5b.stop(); done(e.error); });
+        p5b.on("frame", () => {
+            expect(pt).toBeCloseTo(100, 1);
+            p5b.stop(); done();
+        });
+        p5b.run();
+    });
+});
+
+desc("P5b Integration - point()", () => {
+    it("point() renders a dark pixel at its coordinates", (done) => {
+        const p5b = new P5b({
+            width: 32, height: 32, fps: 30,
+            setup: () => { createCanvas(32, 32); },
+            draw: () => {
+                background(255);
+                stroke(0); strokeWeight(3);
+                point(16, 16);
+                noLoop();
+            }
+        });
+        p5b.on("error", (e) => { p5b.stop(); done(e.error); });
+        p5b.on("frame", (buf) => {
+            const i = (16 * 32 + 16) * 4;
+            expect(buf[i]).toBeLessThan(100);
+            p5b.stop(); done();
+        });
+        p5b.run();
+    });
+});
+
+desc("P5b Integration - Shape primitives render pixels", () => {
+    const assertFilledRed = (drawFn, done) => {
+        const p5b = new P5b({
+            width: 64, height: 64, fps: 30,
+            setup: () => { createCanvas(64, 64); },
+            draw: () => {
+                background(255);
+                noStroke();
+                fill(200, 0, 0);
+                drawFn();
+                noLoop();
+            }
+        });
+        p5b.on("error", (e) => { p5b.stop(); done(e.error); });
+        p5b.on("frame", (buf) => {
+            let red = 0;
+            for (let i = 0; i < buf.length; i += 4) {
+                if (buf[i] > 150 && buf[i + 1] < 80 && buf[i + 2] < 80) red++;
+            }
+            expect(red).toBeGreaterThan(0);
+            p5b.stop(); done();
+        });
+        p5b.run();
+    };
+
+    it("triangle() renders filled red", (done) => assertFilledRed(() => triangle(10, 50, 32, 8, 54, 50), done));
+    it("quad() renders filled red", (done) => assertFilledRed(() => quad(8, 50, 20, 10, 44, 10, 56, 50), done));
+    it("arc() renders filled red", (done) => assertFilledRed(() => arc(32, 32, 40, 40, 0, HALF_PI), done));
+    it("circle() renders filled red", (done) => assertFilledRed(() => circle(32, 32, 40), done));
+    it("square() renders filled red", (done) => assertFilledRed(() => square(20, 20, 24), done));
+});
+
+desc("P5b Integration - loadModel", () => {
+    it.skipIf(isP5v2)("loadModel() returns a geometry (v1)", (done) => {
+        const modelPath = path.resolve(process.cwd(), "test/fixtures/model/triangle.obj");
+        let model;
+        const p5b = new P5b({
+            width: 16, height: 16, fps: 30,
+            setup: () => { createCanvas(16, 16); model = loadModel(modelPath); },
+            draw: () => { noLoop(); }
+        });
+        p5b.on("error", (e) => { p5b.stop(); done(e.error); });
+        p5b.on("frame", () => {
+            expect(model).toBeDefined();
+            expect(model.vertices).toHaveLength(3);
+            expect(model.faces).toHaveLength(1);
+            p5b.stop(); done();
+        });
+        p5b.run();
+    });
+
+    it.skipIf(!isP5v2)("v2: await loadModel() returns a geometry", (done) => {
+        const modelPath = path.resolve(process.cwd(), "test/fixtures/model/triangle.obj");
+        let model;
+        const p5b = new P5b({
+            width: 16, height: 16, fps: 30,
+            setup: async () => {
+                createCanvas(16, 16);
+                model = await loadModel(modelPath);
+            },
+            draw: () => { noLoop(); }
+        });
+        p5b.on("error", (e) => { p5b.stop(); done(e.error); });
+        p5b.on("frame", () => {
+            expect(model).toBeDefined();
+            expect(model.vertices).toHaveLength(3);
+            expect(model.faces).toHaveLength(1);
+            p5b.stop(); done();
+        });
+        p5b.run();
+    });
+});
+
+desc("P5b Integration - loadBlob (v2)", () => {
+    it.skipIf(!isP5v2)("v2: loadBlob() returns a Blob", (done) => {
+        const txtPath = path.resolve(process.cwd(), "test/fixtures/data/test.txt");
+        let blob;
+        const p5b = new P5b({
+            width: 16, height: 16, fps: 30,
+            setup: async () => {
+                createCanvas(16, 16);
+                blob = await loadBlob(txtPath);
+            },
+            draw: () => { noLoop(); }
+        });
+        p5b.on("error", (e) => { p5b.stop(); done(e.error); });
+        p5b.on("frame", () => {
+            expect(blob).toBeDefined();
+            expect(typeof blob.size).toBe("number");
+            expect(blob.size).toBeGreaterThan(0);
+            p5b.stop(); done();
+        });
+        p5b.run();
+    });
+});
+
+desc("P5b Integration - v2 loadJSON", () => {
+    it.skipIf(!isP5v2)("v2: await loadJSON() parses JSON", (done) => {
+        const jsonPath = path.resolve(process.cwd(), "test/fixtures/data/test.json");
+        let data;
+        const p5b = new P5b({
+            width: 16, height: 16, fps: 30,
+            setup: async () => {
+                createCanvas(16, 16);
+                data = await loadJSON(jsonPath);
+            },
+            draw: () => { noLoop(); }
+        });
+        p5b.on("error", (e) => { p5b.stop(); done(e.error); });
+        p5b.on("frame", () => {
+            expect(data).toEqual({ name: "p5b", version: 1 });
+            p5b.stop(); done();
+        });
+        p5b.run();
+    });
+});

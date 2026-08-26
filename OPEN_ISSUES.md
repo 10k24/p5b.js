@@ -53,6 +53,14 @@ API absent headless. Categorized gaps:
 **4. Known-unsupported by design (browser APIs):** sound, video/capture
 (`createCapture`, `createVideo`).
 
+**5. Curves / vertices (version-dependent):**
+- v2 renamed the 2D curve API: `curve()`→`spline()`, `curveVertex()`→`splineVertex()`,
+  `curvePoint()`→`splinePoint()`; `quadraticVertex()` no longer exists in v2.
+- v2 `bezierVertex()` **fails** inside p5's own shape visitor (`custom_shapes.js
+  visitBezierSegment` throws `TypeError: undefined is not an object (evaluating 'v2.position')`),
+  so it cannot render headlessly. v1 `bezierVertex()` works. Standalone `bezier()` works in both
+  (and exercises the v2 Path2D bezier replay).
+
 **Dominant gap category:** browser-DOM-dependent APIs — intentional headless noops (input,
 sound, save) plus the actionable items: `select`/`selectAll`/`removeElements`, DOM-function
 audit, and `save()` loud-failure.
