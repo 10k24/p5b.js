@@ -1,4 +1,4 @@
-// Curves: bezier and curve
+// Curves (bezier(), curve())
 
 function setup() {
     createCanvas(200, 200);

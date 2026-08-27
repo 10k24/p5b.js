@@ -9,6 +9,7 @@
         "p5": "^2.0.0"
     },
     "optionalDependencies": {
-        "zeromq": "^6.0.0"
+        "zeromq": "^6.0.0",
+        "node-termios": "^0.2.0"
     }
 }

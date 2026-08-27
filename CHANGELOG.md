@@ -26,7 +26,7 @@
 ### Breaking Changes
 
 - `stop()` now pauses the sketch (`noLoop()`); call `run()` to resume
-- `remove()` / `clear()` fully tears down the p5 instance and frees resources
+- `remove()` / `clear()` fully tears down the p5.js instance and frees resources
 
 ### New Features
 

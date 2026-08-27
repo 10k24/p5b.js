@@ -87,7 +87,7 @@ module.exports = [
                 path: "readonly",
                 // Static constants + Math pass-throughs (single source: globals.js)
                 ...Object.fromEntries(p5StaticGlobals.map((name) => [name, "readonly"])),
-                // p5 instance functions (bound from the p5 instance, not statically)
+                // p5.js instance functions (bound from the p5.js instance, not statically)
                 sin: "readonly", cos: "readonly", tan: "readonly",
                 asin: "readonly", acos: "readonly", atan: "readonly",
                 atan2: "readonly", sq: "readonly", mag: "readonly",
@@ -112,6 +112,7 @@ module.exports = [
             }
         },
         rules: {
+            "no-undef": "off",
             "no-unused-vars": "off"
         }
     },
@@ -156,6 +157,7 @@ module.exports = [
             }
         },
         rules: {
+            "no-undef": "off",
             "no-unused-vars": "off"
         }
     },

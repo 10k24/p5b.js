@@ -1,6 +1,6 @@
-// Loading sketch from file
+// Load a p5.js sketch from a .js file
 const path = require("path");
-const { P5b } = require("@10k24/p5b");
+const { P5b } = require("../../p5b.js");
 
 const p5b = new P5b({
     width: 200,

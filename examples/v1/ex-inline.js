@@ -1,5 +1,5 @@
-// Using setup/draw callbacks
-const { P5b } = require("@10k24/p5b");
+// Inline setup()/draw() callbacks
+const { P5b } = require("../../p5b.js");
 
 const p5b = new P5b({
     width: 200,

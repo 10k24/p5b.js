@@ -1,4 +1,4 @@
-// Curves: bezier and spline (p5 v2 renamed curve() to spline())
+// Curves (bezier(), spline() — p5.js v2 renamed curve() to spline())
 
 function setup() {
     createCanvas(200, 200);

@@ -1,4 +1,4 @@
-// Generative noise / random field
+// Generative noise()/random() field
 
 function setup() {
     createCanvas(200, 200);

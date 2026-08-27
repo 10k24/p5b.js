@@ -22,8 +22,9 @@ for (const [dest, expected] of Object.entries(files)) {
     }
 }
 
-// Non-generated install artifacts in example dirs (mirrors .gitignore).
-const INSTALL_ARTIFACTS = ["bun.lock", "package-lock.json"];
+// Non-generated files that legitimately live in generated dirs and must be tolerated:
+// install artifacts (bun.lock, package-lock.json) and macOS .DS_Store files.
+const INSTALL_ARTIFACTS = ["bun.lock", "package-lock.json", ".DS_Store"];
 
 // Orphan pass: flag any file sitting in a generated dir that the generator no longer
 // produces (e.g. a renamed example). Scan dirs derived from the files map (any generated

@@ -1,4 +1,4 @@
-// Color modes (HSB) and lerpColor
+// Color modes (HSB) and lerpColor()
 
 function setup() {
     createCanvas(200, 200);

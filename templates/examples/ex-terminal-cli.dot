@@ -1,4 +1,4 @@
-// Render a p5.js sketch in the terminal using truecolor ANSI half-block characters.
+// Render a p5.js sketch in the terminal (truecolor ANSI half-blocks)
 //
 // Usage:
 //   node ex-terminal-cli.js <sketch-path>
@@ -13,7 +13,7 @@
 // Included Sketch: sketch-rings.js — Animated concentric rings pattern.
 //
 // Press Ctrl+C to exit.
-const { P5b } = require("@10k24/p5b");
+const { P5b } = require("../../p5b.js");
 const sketchPath = process.argv[2];
 
 if (!sketchPath) {

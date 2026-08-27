@@ -18,12 +18,9 @@
         "gl": "^8.1.6",
       },
       "peerDependencies": {
-        "p5": "^1.11.0 || ^2.0.0",
+        "p5": "^1.6.0 || ^2.0.0",
       },
     },
-  },
-  "patchedDependencies": {
-    "gifenc@1.0.3": "patches/gifenc@1.0.3.patch",
   },
   "packages": {
     "@babel/runtime": ["@babel/runtime@7.29.2", "", {}, "sha512-JiDShH45zKHWyGe4ZNVRrCjBz8Nh9TMmZG1kh4QTK8hCBTWBi8Da+i7s1fJw7/lYpM4ccepSNfqzZ/QvABBi5g=="],

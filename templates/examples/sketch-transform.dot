@@ -1,4 +1,4 @@
-// Transformations: push/pop, translate, rotate, scale
+// Transformations (push()/pop(), translate(), rotate())
 
 function setup() {
     createCanvas(200, 200);

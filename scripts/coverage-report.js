@@ -128,8 +128,9 @@ function render(files) {
         </section>`;
     }).join("");
 
+    const title = "p5b coverage (v1 + v2 combined)";
     const html = `<!DOCTYPE html>
-<html lang="en"><head><meta charset="utf-8"><title>p5b coverage (v1 + v2)</title>
+<html lang="en"><head><meta charset="utf-8"><title>${title}</title>
 <style>
 body { font-family: -apple-system, "Segoe UI", sans-serif; margin: 0; color: #222; }
 header { padding: 16px 24px; background: #1f2430; color: #fff; }
@@ -152,7 +153,7 @@ td.cnt { width: 56px; text-align: right; color: #999; user-select: none; border-
 tr.hit { background: #f0fff4; } tr.miss { background: #ffebe9; } tr.blank { background: #fafafa; }
 </style></head>
 <body>
-<header><h1>p5b.js coverage — p5 v1 + p5 v2 combined</h1></header>
+<header><h1${title}</h1></header>
 ${summary}
 <main>
 <table class="index"><thead><tr><th>File</th><th>Lines</th><th>Hit</th><th>Funcs</th><th>Hit</th></tr></thead>

@@ -41,7 +41,7 @@ const descriptions = {
 const escapeHtml = (s) =>
     s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
 
-// Compile a canonical single-source example/stub template for one p5 version.
+// Compile a canonical single-source example/stub template for one p5.js version.
 // Supports the `{{?it.v2}}A{{??}}B{{?}}` (if/else) and `{{?it.v2}}A{{?}}` (if-only)
 // forms. Purpose-built (rather than doT) because these are raw JS files — doT's
 // greedy `evaluate` regex would misread their plain `{`/`}` braces.
@@ -79,14 +79,15 @@ const renderStubs = () => {
 };
 
 // Render the example sketches from canonical single-source templates
-// (templates/stubs/examples/*.dot -> examples/{v1,v2}/<name>.js). Each rendered file carries
-// the first-line comment the README lists it under, so the examples section stays in sync.
-// Returns { v1: [{file, name, description}], v2: [...], files: {path: content} }.
+// (templates/examples/{ex-*,sketch-*}.dot -> examples/{v1,v2}/<name>.js). Each rendered file
+// carries the first-line comment the README lists it under, so the examples section stays in
+// sync. Returns { v1: [{file, name, description}], v2: [...], files: {path: content} }.
 const renderExamples = () => {
-    const srcDir = path.join(process.cwd(), "templates", "stubs", "examples");
+    const srcDir = path.join(process.cwd(), "templates", "examples");
     const byVersion = { v1: [], v2: [] };
     const files = {};
-    for (const file of fs.readdirSync(srcDir).filter((f) => f.endsWith(".dot")).sort()) {
+    const isExample = (f) => (f.startsWith("ex-") || f.startsWith("sketch-")) && f.endsWith(".dot");
+    for (const file of fs.readdirSync(srcDir).filter(isExample).sort()) {
         const name = file.replace(/\.dot$/, "");
         const source = fs.readFileSync(path.join(srcDir, file), "utf8");
         for (const ver of ["v1", "v2"]) {
@@ -149,7 +150,7 @@ function renderAll() {
         };
     });
 
-    // preload is a v1-only option — p5 v2 removed the preload() lifecycle and p5b rejects a
+    // preload is a v1-only option — p5.js v2 removed the preload() lifecycle and p5b rejects a
     // preload config under v2. It's not part of the shared P5B_DEFAULTS (v1 injects its own
     // noop default in the constructor), so document it as a v1-only config row below.
     const v1OnlyDefaults = ["preload"];
@@ -163,7 +164,7 @@ function renderAll() {
         key: "preload",
         type: "function",
         default: "noop",
-        description: "p5.js preload() function (v1 only — rejected in p5 v2)"
+        description: "p5.js preload() function (v1 only — rejected in p5.js v2)"
     });
 
     // Create a map of defaults by key for easy access in template
@@ -175,6 +176,21 @@ function renderAll() {
     // Examples come from canonical single-source templates (see renderExamples); the
     // rendered files' first-line comments drive the README descriptions.
     const { v1: v1Examples, v2: v2Examples, files: exampleFiles } = renderExamples();
+
+    // Compile the examples README from the same rendered descriptions (single-source).
+    const exampleReadme = dot.template(
+        fs.readFileSync(path.join(process.cwd(), "templates", "examples", "README.dot"), "utf8")
+    );
+    const formatExampleList = (items) =>
+        items.map((e) => `- \`${e.name}.js\` — ${e.description}`).join("\n");
+    const exampleSections = {};
+    for (const [ver, list] of [["v1", v1Examples], ["v2", v2Examples]]) {
+        exampleSections[ver] = {
+            examples: formatExampleList(list.filter((e) => e.name.startsWith("ex-"))),
+            sketches: formatExampleList(list.filter((e) => e.name.startsWith("sketch-"))),
+        };
+    }
+    const examplesReadme = exampleReadme(exampleSections);
 
     const readme = dots.README({ defaults, defaultsByKey, stubs, v1Examples, v2Examples });
 
@@ -211,14 +227,16 @@ function renderAll() {
         .replace(/\n{3,}/g, "\n\n");
 
     // Compile the examples' package.json manifests from the single .dot template.
-    // The per-version config below is the only irreducible data (dir + explicit p5 range,
+    // The per-version config below is the only irreducible data (dir + explicit p5.js range,
     // which preserves the verified ^1.6.0 floor for v1).
     const exampleVersions = [
         { dir: "v1", p5: "^1.6.0" },
         { dir: "v2", p5: "^2.0.0" },
     ];
 
-    const examplesPkg = dots["examples-package"];
+    const examplesPkg = dot.template(
+        fs.readFileSync(path.join(process.cwd(), "templates", "examples", "package.json.dot"), "utf8")
+    );
 
     // Convert [key, value][] pairs into template deps rows with a precomputed trailing comma
     // (avoids template conditionals, which are fragile to compile).
@@ -230,6 +248,7 @@ function renderAll() {
 
     const files = {
         "README.md": cleanedReadme,
+        "examples/README.md": examplesReadme.endsWith("\n") ? examplesReadme : `${examplesReadme}\n`,
         ...stubs.files,
         ...exampleFiles
     };
@@ -240,8 +259,9 @@ function renderAll() {
             version,
             description: `p5b examples for p5.js ${major}.x`,
             deps: deps([[name, version], ["p5", p5]]),
-            // zeromq is optional: only the ZMQ example needs it (see ex-p5b-zmq.js).
-            optionalDeps: deps([["zeromq", "^6.0.0"]]),
+            optionalDeps: deps([
+                ["zeromq", "^6.0.0"], ["node-termios", "^0.2.0"]
+            ]),
         })}\n`;
     }
 

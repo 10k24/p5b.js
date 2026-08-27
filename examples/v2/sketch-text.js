@@ -1,4 +1,4 @@
-// Text rendering: text, textSize, textAlign, textStyle, textWidth
+// Text rendering (text(), textSize(), textAlign(), textStyle(), textWidth())
 
 function setup() {
     createCanvas(200, 200);

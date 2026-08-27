@@ -1,4 +1,3 @@
-/* eslint-disable no-console */
 /**
  * Memory leak test for p5b.js stop()/run() lifecycle.
  *

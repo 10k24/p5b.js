@@ -1,4 +1,3 @@
-/* eslint-disable no-undef */
 const { describe: desc, it, expect } = require("bun:test");
 const path = require("path");
 

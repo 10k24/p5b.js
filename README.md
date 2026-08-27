@@ -1,5 +1,7 @@
 # @10k24/p5b
 
+[![npm](https://img.shields.io/npm/v/@10k24/p5b)](https://www.npmjs.com/package/@10k24/p5b)
+
 Render p5.js sketches to RGBA pixel buffers in Node.js.
 
 ## Installation
@@ -141,7 +143,7 @@ Creates a new P5b instance with the given options.
 | `setup` | function | noop | p5.js setup() function |
 | `draw` | function | noop | p5.js draw() function |
 | `maxPoolSize` | number | 4 | Max pooled createGraphics objects retained per width:height bucket (0 = no pooling) |
-| `preload` | function | noop | p5.js preload() function (v1 only — rejected in p5 v2) |
+| `preload` | function | noop | p5.js preload() function (v1 only — rejected in p5.js v2) |
 
 ### Methods
 
@@ -235,37 +237,6 @@ Two example sets, one per supported p5.js version, plus shared utilities:
 - [examples/v1/](examples/v1/) — p5.js 1.x examples
 - [examples/v2/](examples/v2/) — p5.js 2.x examples (async/await, no `preload()`)
 - [examples/common/](examples/common/) — shared utilities for both sets
-
-### v1 — p5.js 1.x
-
-- [examples/v1/ex-file-based.js](examples/v1/ex-file-based.js) — Loading sketch from file
-- [examples/v1/ex-inline.js](examples/v1/ex-inline.js) — Using setup/draw callbacks
-- [examples/v1/ex-p5b-zmq.js](examples/v1/ex-p5b-zmq.js) — Stream p5.js sketch output to a ZMQ-based LED matrix broker.
-- [examples/v1/ex-terminal-cli.js](examples/v1/ex-terminal-cli.js) — Render a p5.js sketch in the terminal using truecolor ANSI half-block characters.
-- [examples/v1/sketch-basic.js](examples/v1/sketch-basic.js) — Red rectangle on a gray canvas
-- [examples/v1/sketch-color.js](examples/v1/sketch-color.js) — Color modes (HSB) and lerpColor
-- [examples/v1/sketch-curves.js](examples/v1/sketch-curves.js) — Curves: bezier and curve
-- [examples/v1/sketch-noise.js](examples/v1/sketch-noise.js) — Generative noise / random field
-- [examples/v1/sketch-primitives.js](examples/v1/sketch-primitives.js) — Drawing primitives: triangle, quad, arc, line, point, rect, ellipse
-- [examples/v1/sketch-rings.js](examples/v1/sketch-rings.js) — Concentric rings
-- [examples/v1/sketch-text.js](examples/v1/sketch-text.js) — Text rendering: text, textSize, textAlign, textStyle, textWidth
-- [examples/v1/sketch-transform.js](examples/v1/sketch-transform.js) — Transformations: push/pop, translate, rotate, scale
-
-### v2 — p5.js 2.x
-
-- [examples/v2/ex-file-based.js](examples/v2/ex-file-based.js) — Loading sketch from file
-- [examples/v2/ex-inline.js](examples/v2/ex-inline.js) — Using setup/draw callbacks (async setup)
-- [examples/v2/ex-p5b-zmq.js](examples/v2/ex-p5b-zmq.js) — Stream p5.js sketch output to a ZMQ-based LED matrix broker.
-- [examples/v2/ex-terminal-cli.js](examples/v2/ex-terminal-cli.js) — Render a p5.js sketch in the terminal using truecolor ANSI half-block characters.
-- [examples/v2/sketch-basic.js](examples/v2/sketch-basic.js) — Red rectangle on a gray canvas
-- [examples/v2/sketch-color.js](examples/v2/sketch-color.js) — Color modes (HSB) and lerpColor
-- [examples/v2/sketch-curves.js](examples/v2/sketch-curves.js) — Curves: bezier and spline (p5 v2 renamed curve() to spline())
-- [examples/v2/sketch-noise.js](examples/v2/sketch-noise.js) — Generative noise / random field
-- [examples/v2/sketch-primitives.js](examples/v2/sketch-primitives.js) — Drawing primitives: triangle, quad, arc, line, point, rect, ellipse
-- [examples/v2/sketch-rings.js](examples/v2/sketch-rings.js) — Concentric rings
-- [examples/v2/sketch-text.js](examples/v2/sketch-text.js) — Text rendering: text, textSize, textAlign, textStyle, textWidth
-- [examples/v2/sketch-transform.js](examples/v2/sketch-transform.js) — Transformations: push/pop, translate, rotate, scale
-- [examples/v2/sketch-world.js](examples/v2/sketch-world.js) — WebGL shader globe
 
 ## Buffer Format
 

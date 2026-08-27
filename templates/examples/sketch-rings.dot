@@ -1,4 +1,4 @@
-// Concentric rings
+// Animated concentric rings
 
 let hexColors = [
     "#95E06C",
@@ -23,7 +23,8 @@ function draw() {
         sqrt(2 * windowHeight * windowHeight)
     );
 
-    const radius = (2 * frameCount) % maxRadius;
+    const s = map(windowWidth, 80, 1720, 2, 30);
+    const radius = (s * frameCount) % maxRadius;
 
     const cX = windowWidth / 2;
     const cY = windowHeight / 2;

@@ -1,4 +1,4 @@
-// Stream p5.js sketch output to a ZMQ-based LED matrix broker.
+// Stream frames over ZeroMQ
 //
 // Requires the optional 'zeromq' dependency. Install with:
 //   npm install --include=optional
@@ -23,7 +23,7 @@
 //   - Frame rate: 10 fps
 //
 // Press Ctrl+C to close the connection and exit.
-const { P5b } = require("@10k24/p5b");
+const { P5b } = require("../../p5b.js");
 const { Request } = require("zeromq");
 const { P5bZMQ } = require("../common/p5b-zmq");
 

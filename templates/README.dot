@@ -1,5 +1,7 @@
 # @10k24/p5b
 
+[![npm](https://img.shields.io/npm/v/@10k24/p5b)](https://www.npmjs.com/package/@10k24/p5b)
+
 Render p5.js sketches to RGBA pixel buffers in Node.js.
 
 ## Installation
@@ -155,15 +157,6 @@ Two example sets, one per supported p5.js version, plus shared utilities:
 - [examples/v1/](examples/v1/) — p5.js 1.x examples
 - [examples/v2/](examples/v2/) — p5.js 2.x examples (async/await, no `preload()`)
 - [examples/common/](examples/common/) — shared utilities for both sets
-
-### v1 — p5.js 1.x
-{{~it.v1Examples :example}}
-- [{{=example.file}}]({{=example.file}}) — {{=example.description}}
-{{~}}
-### v2 — p5.js 2.x
-{{~it.v2Examples :example}}
-- [{{=example.file}}]({{=example.file}}) — {{=example.description}}
-{{~}}
 
 ## Buffer Format
 

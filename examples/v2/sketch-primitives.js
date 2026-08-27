@@ -1,4 +1,4 @@
-// Drawing primitives: triangle, quad, arc, line, point, rect, ellipse
+// Drawing primitives (triangle(), quad(), arc(), line(), point(), rect(), ellipse())
 
 function setup() {
     createCanvas(200, 200);

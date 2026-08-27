@@ -32,7 +32,7 @@
         "test": "bun run validate:docs && bun test",
         "test:v1": "P5B_P5_PATH=p5 bun test",
         "test:v2": "P5B_P5_PATH=p5-v2 bun test",
-        "test:all": "bun run test:v1 && bun run test:v2 && bun run validate:docs",
+        "test:all": "bun run test:v1 && bun run test:v2 && bun run test:webgl && bun run validate:docs",
         "test:coverage": "P5B_P5_PATH=p5 bun test --coverage && P5B_P5_PATH=p5-v2 bun test --coverage",
         "test:webgl": "P5B_P5_PATH=p5-v2 node --test --test-force-exit test/webgl.node.js test/webgl-shaders.node.js",
         "coverage:html": "node scripts/coverage-report.js",
@@ -42,7 +42,8 @@
         "drift": "node scripts/compare-adapters.js",
         "fix": "bunx eslint --fix",
         "docs": "node scripts/build-docs.js",
-        "validate:docs": "node scripts/validate-docs.js"
+        "validate:docs": "node scripts/validate-docs.js",
+        "act": "sh scripts/act.sh"
     },
     "license": "LGPL-2.1-only",
     "engines": {

@@ -1,6 +1,6 @@
-// Using setup/draw callbacks (async setup)
+// Inline callbacks with async setup()
 // p5.js 2.x removed the preload() lifecycle, so async work happens in an async setup().
-const { P5b } = require("@10k24/p5b");
+const { P5b } = require("../../p5b.js");
 
 const p5b = new P5b({
     width: 200,
