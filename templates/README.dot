@@ -46,7 +46,7 @@ async function setup() {
 
 | p5.js version | Status |
 |---|---|
-| v1.9+ | Fully supported |
+| v1.6+ | Fully supported |
 | v2.x | Supported (see v2 notes below) |
 
 **p5.js v2 headless shims** — p5b provides browser-API compatibility so p5 v2 runs headlessly:
@@ -141,7 +141,7 @@ Emitted after each draw cycle with the rendered frame buffer.
 
 #### `'error'` event
 
-Emitted when an error occurs in preload, setup, or draw.
+Emitted when an error occurs in setup or draw (and in v1, preload).
 
 <table>
 <tr><th>v1</th><th>v2</th></tr>

@@ -6,7 +6,7 @@ const p5b = new P5b({
     width: 200,
     height: 200,
     fps: 60,
-    sketchPath: path.join(__dirname, "sketch.js")
+    sketchPath: path.join(__dirname, "sketch-basic.js")
 });
 
 p5b.on("frame", (buffer) => {

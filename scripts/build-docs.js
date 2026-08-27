@@ -41,6 +41,71 @@ const descriptions = {
 const escapeHtml = (s) =>
     s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
 
+// Compile a canonical single-source example/stub template for one p5 version.
+// Supports the `{{?it.v2}}A{{??}}B{{?}}` (if/else) and `{{?it.v2}}A{{?}}` (if-only)
+// forms. Purpose-built (rather than doT) because these are raw JS files — doT's
+// greedy `evaluate` regex would misread their plain `{`/`}` braces.
+const compileVersion = (src, v2) => {
+    let out = src.replace(
+        /\{\{\?it\.v2\}\}([\s\S]*?)\{\{\?\?\}\}([\s\S]*?)\{\{\?\}\}/g,
+        (_, ifBody, elseBody) => (v2 ? ifBody : elseBody)
+    );
+    out = out.replace(
+        /\{\{\?it\.v2\}\}([\s\S]*?)\{\{\?\}\}/g,
+        (_, ifBody) => (v2 ? ifBody : "")
+    );
+    return out;
+};
+
+// Example sketches that are genuinely v2-only (e.g. WebGL shaders) — not emitted for v1.
+const V2_ONLY_EXAMPLES = ["sketch-world"];
+
+// Render the README code-sample stubs from canonical single-source templates
+// (templates/stubs/src/*.dot -> templates/stubs/{v1,v2}/readme-*.js).
+// Returns { v1: {name: html}, v2: {name: html}, files: {path: content} }.
+const renderStubs = () => {
+    const srcDir = path.join(process.cwd(), "templates", "stubs", "src");
+    const result = { v1: {}, v2: {}, files: {} };
+    for (const file of fs.readdirSync(srcDir).filter((f) => f.startsWith("readme-") && f.endsWith(".dot")).sort()) {
+        const name = file.replace(/^readme-/, "").replace(/\.dot$/, "");
+        const source = fs.readFileSync(path.join(srcDir, file), "utf8");
+        for (const ver of ["v1", "v2"]) {
+            const content = compileVersion(source, ver === "v2").trim();
+            result[ver][name] = escapeHtml(content);
+            result.files[`templates/stubs/${ver}/readme-${name}.js`] = `${content}\n`;
+        }
+    }
+    return result;
+};
+
+// Render the example sketches from canonical single-source templates
+// (templates/stubs/examples/*.dot -> examples/{v1,v2}/<name>.js). Each rendered file carries
+// the first-line comment the README lists it under, so the examples section stays in sync.
+// Returns { v1: [{file, name, description}], v2: [...], files: {path: content} }.
+const renderExamples = () => {
+    const srcDir = path.join(process.cwd(), "templates", "stubs", "examples");
+    const byVersion = { v1: [], v2: [] };
+    const files = {};
+    for (const file of fs.readdirSync(srcDir).filter((f) => f.endsWith(".dot")).sort()) {
+        const name = file.replace(/\.dot$/, "");
+        const source = fs.readFileSync(path.join(srcDir, file), "utf8");
+        for (const ver of ["v1", "v2"]) {
+            if (ver === "v1" && V2_ONLY_EXAMPLES.includes(name)) continue;
+            const content = compileVersion(source, ver === "v2");
+            const firstLine = content.split("\n")[0];
+            const match = firstLine.match(/^\/\/\s+(.+)$/);
+            byVersion[ver].push({
+                file: `examples/${ver}/${name}.js`,
+                name,
+                description: match ? match[1] : "Example"
+            });
+            // Ensure exactly one trailing newline (matches hand-written examples; eol-last).
+            files[`examples/${ver}/${name}.js`] = content.endsWith("\n") ? content : `${content}\n`;
+        }
+    }
+    return { v1: byVersion.v1, v2: byVersion.v2, files };
+};
+
 // Write a generated file and log its repo-root-relative path (tab-delimited).
 const writeOutput = (dest, content) => {
     fs.writeFileSync(path.join(process.cwd(), dest), content, "utf8");
@@ -55,18 +120,9 @@ const writeOutput = (dest, content) => {
 function renderAll() {
     const { name, version } = require("../package.json");
 
-    // Load stub files from version-specific subdirectories (templates/stubs/v1, /v2).
-    // Each stub is rendered inside an HTML <pre> block in the README's v1|v2 tables.
-    const stubs = { v1: {}, v2: {} };
-    const stubsDir = path.join(process.cwd(), "templates", "stubs");
-    for (const stubVersion of ["v1", "v2"]) {
-        fs.readdirSync(path.join(stubsDir, stubVersion)).forEach(file => {
-            if (file.startsWith("readme-") && file.endsWith(".js")) {
-                const stubName = file.replace(/^readme-/, "").replace(/\.js$/, "");
-                stubs[stubVersion][stubName] = escapeHtml(fs.readFileSync(path.join(stubsDir, stubVersion, file), "utf8").trim());
-            }
-        });
-    }
+    // Load stub files from canonical single-source templates. Each rendered stub is
+    // embedded in an HTML <pre> block in the README's v1|v2 tables.
+    const stubs = renderStubs();
 
     const dots = dot.process({ path: path.join(process.cwd(), "templates") });
 
@@ -116,34 +172,9 @@ function renderAll() {
         defaultsByKey[d.key] = d;
     });
 
-    // Load examples with descriptions from first-line comments. Examples live in
-    // version-specific subdirectories (examples/v1, examples/v2). Both runner scripts
-    // (ex-*.js) and sketches (sketch-*.js) are listed.
-    const examplesDir = path.join(process.cwd(), "examples");
-
-    const scanExamples = (dir) => {
-        const fullDir = path.join(examplesDir, dir);
-        const items = [];
-        fs.readdirSync(fullDir)
-            .filter(file => /^(ex-|sketch-).*\.js$/.test(file))
-            .sort()
-            .forEach(file => {
-                const filePath = path.join(fullDir, file);
-                const content = fs.readFileSync(filePath, "utf8");
-                const firstLine = content.split("\n")[0];
-                const match = firstLine.match(/^\/\/\s+(.+)$/);
-                const description = match ? match[1] : "Example";
-                items.push({
-                    file: `examples/${dir}/${file}`,
-                    name: file.replace(/\.js$/, ""),
-                    description
-                });
-            });
-        return items;
-    };
-
-    const v1Examples = scanExamples("v1");
-    const v2Examples = scanExamples("v2");
+    // Examples come from canonical single-source templates (see renderExamples); the
+    // rendered files' first-line comments drive the README descriptions.
+    const { v1: v1Examples, v2: v2Examples, files: exampleFiles } = renderExamples();
 
     const readme = dots.README({ defaults, defaultsByKey, stubs, v1Examples, v2Examples });
 
@@ -181,9 +212,9 @@ function renderAll() {
 
     // Compile the examples' package.json manifests from the single .dot template.
     // The per-version config below is the only irreducible data (dir + explicit p5 range,
-    // which preserves the intentional ^1.11.0 floor for v1).
+    // which preserves the verified ^1.6.0 floor for v1).
     const exampleVersions = [
-        { dir: "v1", p5: "^1.11.0" },
+        { dir: "v1", p5: "^1.6.0" },
         { dir: "v2", p5: "^2.0.0" },
     ];
 
@@ -197,7 +228,11 @@ function renderAll() {
         comma: i < pairs.length - 1 ? "," : "",
     }));
 
-    const files = { "README.md": cleanedReadme };
+    const files = {
+        "README.md": cleanedReadme,
+        ...stubs.files,
+        ...exampleFiles
+    };
     for (const { dir, p5 } of exampleVersions) {
         const major = Number(dir.slice(1));
         files[`examples/${dir}/package.json`] = `${examplesPkg({
@@ -223,10 +258,7 @@ if (require.main === module) {
 
     // eslint-disable-next-line no-console
     console.log("Compiling README.dot to function");
-    writeOutput("README.md", files["README.md"]);
-
-    // eslint-disable-next-line no-console
-    console.log("Compiling examples-package.json.dot to function");
-    writeOutput("examples/v1/package.json", files["examples/v1/package.json"]);
-    writeOutput("examples/v2/package.json", files["examples/v2/package.json"]);
+    for (const [dest, content] of Object.entries(files)) {
+        writeOutput(dest, content);
+    }
 }

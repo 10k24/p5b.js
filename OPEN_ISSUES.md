@@ -22,8 +22,7 @@ API absent headless. Categorized gaps:
 
 **1. Explicitly noop'd — present but silently swallow calls (`lib/p5b-base.js`):**
 - Accessibility: `describe`, `describeElement`, `textOutput`, `gridOutput`
-- Save/export: `saveCanvas`, `saveFrames`, `saveJSON`, `saveStrings`, `saveTable`, `saveImage`
-  — note plain `save()` is **not** noop'd: it binds and attempts a DOM download (real gap).
+- Save/export: `saveCanvas`, `saveFrames`, `saveJSON`, `saveStrings`, `saveTable`, `saveImage`, `save`
 - Input handlers (no headless input): `mousePressed`, `mouseReleased`, `mouseMoved`,
   `mouseDragged`, `mouseWheel`, `keyPressed`, `keyReleased`, `touchStarted`, `touchEnded`,
   `touchMoved`
@@ -62,12 +61,15 @@ API absent headless. Categorized gaps:
   (and exercises the v2 Path2D bezier replay).
 
 **Dominant gap category:** browser-DOM-dependent APIs — intentional headless noops (input,
-sound, save) plus the actionable items: `select`/`selectAll`/`removeElements`, DOM-function
-audit, and `save()` loud-failure.
+sound, save) plus the actionable items: `select`/`selectAll`/`removeElements` and the
+DOM-function audit.
 
 > Accepted tradeoff (not a task): `loadFont()` is synchronous (blocking file I/O) while
 > `loadJSON()` is async. Known inconsistency vs browser p5.js where both share the
 > callback/preload pattern.
+
+**6. p5.js Strands support**
+- Add an example for using p5 strands, only supported in v2.x. This is a new way of writing shader code with JS directly. Reference examples in the p5.js repo.
 
 ---
 
@@ -76,7 +78,8 @@ audit, and `save()` loud-failure.
 ### Global Alpha Override
 Add an `alpha` property to P5b config (integer in [0, 255]) to apply constant opacity to
 every emitted frame. **Fix:** scale the RGBA frame buffer alpha channel by `alpha / 255`
-in `toFrame()`. (Next v1.3.0 candidate.)
+in `toFrame()`. Keep the scaling logic **inlined** in each adapter's `toFrame()` (no shared
+helper). Held for now; target 2.0.0+.
 
 ### loadXML() (full support — bandaged for now)
 `loadXML()` is not implemented. As a bandage, both adapters now throw a helpful error
@@ -140,7 +143,20 @@ Require browser APIs unavailable in Node.js.
 
 # Completed Items
 
-- **`lib` directory refactor** — moved `globals.js`, `p5b-base.js`, `p5b_v1.js`, `p5b_v2.js`,
+- **load\* binding de-dup (Option A)** — moved the byte-identical bindings
+  (`createGraphics`, `loadShader`, `loadModel`, `loadXML`) from `p5b_v1.js`/`p5b_v2.js` into
+  the shared `P5bBase._bindGlobals()`. Version-divergent loaders (`loadFont`, `loadImage`,
+  `loadJSON`, `loadStrings`, `loadBytes`, `loadTable`, `createCanvas`, `loadBlob`) stay in
+  their adapters — v1 uses sync shells + `_preloadHandle()`, v2 uses async promises, so forcing
+  them together would create a shallow module full of version branches (Special-General
+  Mixture). v2-only `loadBlob` retained in `p5b_v2.js`.
+- **True p5 v1 floor verified = 1.6.0** — binary-searched p5 1.x against the v1 suite. The only
+  sub-1.6 failure is `getTargetFrameRate()` (a p5 API added in v1.6.0); 1.6.0 passes the full
+  v1 suite (237/0). `peerDependencies` lowered from `^1.11.0` to `^1.6.0`; README compatibility
+  table and the examples/v1 manifest floor aligned.
+- **`save()` noop** — added plain `save()` to the headless noop list in `lib/p5b-base.js` (was
+  binding and attempting a DOM download). Corrected the stale OPEN_ISSUES note accordingly.
+- **lib directory refactor** — moved `globals.js`, `p5b-base.js`, `p5b_v1.js`, `p5b_v2.js`,
   `p5b-dom.js` under `lib/` (only `p5b.js`/`p5b.mjs` remain in root; `eslint.config.js` stays).
   Updated all require/import paths (`p5b.js`, `eslint.config.js`, `test/p5b.test.js`,
   `scripts/compare-adapters.js`; fixed `lib/p5b-dom.js` package.json require). `package.json`

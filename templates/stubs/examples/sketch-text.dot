@@ -1,0 +1,25 @@
+// Text rendering: text, textSize, textAlign, textStyle, textWidth
+
+function setup() {
+    createCanvas(200, 200);
+    background(255);
+}
+
+function draw() {
+    background(255);
+    fill(0);
+
+    textAlign(LEFT, CENTER);
+    textSize(16);
+    textStyle(NORMAL);
+    text("Hello p5b", 20, 50);
+
+    textSize(24);
+    textStyle(BOLD);
+    text("Hello p5b", 20, 100);
+
+    textAlign(CENTER, CENTER);
+    textSize(12);
+    textStyle(ITALIC);
+    text("textWidth: " + nf(textWidth("Hello p5b"), 1, 1), 100, 160);
+}

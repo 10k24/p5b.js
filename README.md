@@ -108,7 +108,7 @@ async function setup() {
 
 | p5.js version | Status |
 |---|---|
-| v1.9+ | Fully supported |
+| v1.6+ | Fully supported |
 | v2.x | Supported (see v2 notes below) |
 
 **p5.js v2 headless shims** — p5b provides browser-API compatibility so p5 v2 runs headlessly:
@@ -217,7 +217,7 @@ Emitted after each draw cycle with the rendered frame buffer.
 
 #### `'error'` event
 
-Emitted when an error occurs in preload, setup, or draw.
+Emitted when an error occurs in setup or draw (and in v1, preload).
 
 <table>
 <tr><th>v1</th><th>v2</th></tr>
@@ -242,6 +242,7 @@ Two example sets, one per supported p5.js version, plus shared utilities:
 - [examples/v1/ex-inline.js](examples/v1/ex-inline.js) — Using setup/draw callbacks
 - [examples/v1/ex-p5b-zmq.js](examples/v1/ex-p5b-zmq.js) — Stream p5.js sketch output to a ZMQ-based LED matrix broker.
 - [examples/v1/ex-terminal-cli.js](examples/v1/ex-terminal-cli.js) — Render a p5.js sketch in the terminal using truecolor ANSI half-block characters.
+- [examples/v1/sketch-basic.js](examples/v1/sketch-basic.js) — Red rectangle on a gray canvas
 - [examples/v1/sketch-color.js](examples/v1/sketch-color.js) — Color modes (HSB) and lerpColor
 - [examples/v1/sketch-curves.js](examples/v1/sketch-curves.js) — Curves: bezier and curve
 - [examples/v1/sketch-noise.js](examples/v1/sketch-noise.js) — Generative noise / random field
@@ -256,6 +257,7 @@ Two example sets, one per supported p5.js version, plus shared utilities:
 - [examples/v2/ex-inline.js](examples/v2/ex-inline.js) — Using setup/draw callbacks (async setup)
 - [examples/v2/ex-p5b-zmq.js](examples/v2/ex-p5b-zmq.js) — Stream p5.js sketch output to a ZMQ-based LED matrix broker.
 - [examples/v2/ex-terminal-cli.js](examples/v2/ex-terminal-cli.js) — Render a p5.js sketch in the terminal using truecolor ANSI half-block characters.
+- [examples/v2/sketch-basic.js](examples/v2/sketch-basic.js) — Red rectangle on a gray canvas
 - [examples/v2/sketch-color.js](examples/v2/sketch-color.js) — Color modes (HSB) and lerpColor
 - [examples/v2/sketch-curves.js](examples/v2/sketch-curves.js) — Curves: bezier and spline (p5 v2 renamed curve() to spline())
 - [examples/v2/sketch-noise.js](examples/v2/sketch-noise.js) — Generative noise / random field

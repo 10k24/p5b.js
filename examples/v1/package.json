@@ -6,7 +6,7 @@
     "type": "commonjs",
     "dependencies": {
         "@10k24/p5b": "1.2.2",
-        "p5": "^1.11.0"
+        "p5": "^1.6.0"
     },
     "optionalDependencies": {
         "zeromq": "^6.0.0"

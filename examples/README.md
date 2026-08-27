@@ -30,7 +30,7 @@ If it wasn't installed, run `npm install --include=optional` in the relevant dir
 
 Sketches:
 
-- `sketch.js` — Red rectangle on a gray canvas
+- `sketch-basic.js` — Red rectangle on a gray canvas
 - `sketch-rings.js` — Animated concentric rings
 - `sketch-color.js` — Color modes (HSB) and `lerpColor()`
 - `sketch-primitives.js` — Drawing primitives (triangle, quad, arc, line, point, rect, ellipse)
@@ -48,7 +48,7 @@ Sketches:
 
 Sketches:
 
-- `sketch.js` — Red rectangle on a gray canvas
+- `sketch-basic.js` — Red rectangle on a gray canvas
 - `sketch-rings.js` — Animated concentric rings
 - `sketch-color.js` — Color modes (HSB) and `lerpColor()`
 - `sketch-primitives.js` — Drawing primitives (triangle, quad, arc, line, point, rect, ellipse)
