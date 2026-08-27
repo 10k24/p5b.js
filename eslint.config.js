@@ -1,8 +1,7 @@
 const js = require("@eslint/js");
-const { mathConstants, mathFunctions, p5Constants } = require("./lib/globals");
+const { mathFunctions, p5Constants } = require("./lib/globals");
 
-// Names of the static globals p5b binds in _bindGlobals() (single source: globals.js)
-const p5StaticGlobals = Object.keys({ ...mathConstants, ...mathFunctions, ...p5Constants });
+const p5StaticGlobals = Object.keys({ ...mathFunctions, ...p5Constants });
 
 module.exports = [
     {
@@ -41,7 +40,8 @@ module.exports = [
             "no-unused-vars": ["error", { argsIgnorePattern: "^_", caughtErrorsIgnorePattern: "^_" }],
             "no-console": ["warn"],
             "eol-last": ["error", "always"],
-            "no-multiple-empty-lines": ["error", { "max": 1, "maxEOF": 0 }]
+            "no-multiple-empty-lines": ["error", { "max": 1, "maxEOF": 0 }],
+            "no-trailing-spaces": ["error"]
         }
     },
     {

@@ -149,7 +149,7 @@ describe("P5b Instance Management", () => {
             // After remove, internal state should be cleared
             expect(p5b._myP5).toBeNull();
             expect(p5b._destCanvas).toBeNull();
-            expect(p5b._gfxActive.length).toBe(0);
+            expect(p5b._activeGfx.length).toBe(0);
             expect(p5b._gfxPool.size).toBe(0);
             done();
         });
@@ -181,11 +181,11 @@ describe("P5b Instance Management", () => {
                 // First frame establishes cache
                 expect(p5b._destCanvas).toBeDefined();
                 const cachedCanvas = p5b._destCanvas;
-                
+
                 // Second frame should reuse same canvas
                 p5b.toFrame();
                 expect(p5b._destCanvas).toBe(cachedCanvas);
-                
+
                 p5b.stop();
                 done();
             }
@@ -352,7 +352,7 @@ describe("P5b Global Bindings", () => {
                     const pg1 = createGraphics(20, 20);
                     const pg2 = createGraphics(20, 20);
                     const pg3 = createGraphics(30, 30);
-                    
+
                     // Remove them to return to pool
                     pg1.remove();
                     pg2.remove();
@@ -367,12 +367,12 @@ describe("P5b Global Bindings", () => {
                 // After first frame, graphics should be in pool
                 const pool20x20 = p5b._gfxPool.get("20:20");
                 const pool30x30 = p5b._gfxPool.get("30:30");
-                
+
                 expect(pool20x20).toBeDefined();
                 expect(pool20x20.length).toBe(2);
                 expect(pool30x30).toBeDefined();
                 expect(pool30x30.length).toBe(1);
-                
+
                 p5b.stop();
                 done();
             }

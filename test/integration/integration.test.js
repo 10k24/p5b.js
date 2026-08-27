@@ -2,7 +2,7 @@
 const { describe: desc, it, expect } = require("bun:test");
 const path = require("path");
 
-// Detect p5 version for skipping v2-incompatible tests
+// Detect p5.js version for skipping v2-incompatible tests
 const isP5v2 = (process.env.P5B_P5_PATH || "p5") !== "p5";
 const { P5b } = require("../../p5b");
 
@@ -120,7 +120,7 @@ desc("P5b Integration - Buffer Analysis", () => {
 
         p5b.on("frame", (buffer) => {
             expect(buffer.length).toBe(4 * 8 * 4);
-            
+
             const px = (x, y) => {
                 const i = (y * 4 + x) * 4;
                 return [buffer[i], buffer[i+1], buffer[i+2], buffer[i+3]];
@@ -130,7 +130,7 @@ desc("P5b Integration - Buffer Analysis", () => {
             expect(px(3, 0)).toEqual([255, 0, 0, 255]);
             expect(px(0, 3)).toEqual([255, 0, 0, 255]);
             expect(px(3, 3)).toEqual([255, 0, 0, 255]);
-            
+
             // Blank buffer expected below the scaled frame
             expect(px(0, 4)).toEqual([0, 0, 0, 0]);
             expect(px(0, 7)).toEqual([0, 0, 0, 0]);
@@ -160,7 +160,7 @@ desc("P5b Integration - Buffer Analysis", () => {
 
         p5b.on("frame", (buffer) => {
             expect(buffer.length).toBe(8 * 4 * 4);
-            
+
             const px = (x, y) => {
                 const i = (y * 8 + x) * 4;
                 return [buffer[i], buffer[i+1], buffer[i+2], buffer[i+3]];
@@ -200,7 +200,7 @@ desc("P5b Integration - Buffer Analysis", () => {
 
         p5b.on("frame", (buffer) => {
             expect(buffer.length).toBe(4 * 4 * 4);
-            
+
             const px = (x, y) => {
                 const i = (y * 4 + x) * 4;
                 return [buffer[i], buffer[i+1], buffer[i+2], buffer[i+3]];
@@ -1082,7 +1082,7 @@ desc("P5b Integration - Time Functions", () => {
     it("should return current time values matching native Date", (done) => {
         const now = new Date();
         const results = {};
-        
+
         const p5b = new P5b({
             width: 16, height: 16,
             fps: 30,
@@ -1102,7 +1102,7 @@ desc("P5b Integration - Time Functions", () => {
         });
 
         p5b.on("error", doneErr);
-        
+
         p5b.on("frame", (buffer) => {
             expect(results.year).toBe(now.getFullYear());
             expect(results.month).toBe(now.getMonth() + 1);
@@ -1116,7 +1116,7 @@ desc("P5b Integration - Time Functions", () => {
             p5b.stop();
             done();
         });
-        
+
         p5b.run();
     });
 });
@@ -1135,7 +1135,7 @@ desc("P5b Integration - Environment Functions", () => {
                 noLoop();
             }
         });
-        
+
         p5b.on("frame", (buffer) => {
             // Framerate seems to be 34 for some reason
             expect(Math.floor(results.fps) - 30).toBeLessThan(5);
@@ -1143,7 +1143,7 @@ desc("P5b Integration - Environment Functions", () => {
             p5b.stop();
             done();
         });
-        
+
         p5b.run();
     });
 
@@ -1157,13 +1157,13 @@ desc("P5b Integration - Environment Functions", () => {
                 results.isLooping = isLooping();
             }
         });
-        
+
         p5b.on("frame", (buffer) => {
             expect(results.isLooping).toBe(false);
             p5b.stop();
             done();
         });
-        
+
         p5b.run();
     });
 });
@@ -1177,7 +1177,7 @@ desc("P5b Integration - Loop Control", () => {
             setup: () => { createCanvas(100, 100); },
             draw: () => { frameCount++; }
         });
-        
+
         p5b.on("frame", (buffer) => {
             // Should get multiple frames before timeout
             if (frameCount >= 3) {
@@ -1186,10 +1186,10 @@ desc("P5b Integration - Loop Control", () => {
                 done();
             }
         });
-        
+
         p5b.run();
     });
-    
+
     it("should stop emitting frames after noLoop() in setup", (done) => {
         let framesReceived = 0;
         const p5b = new P5b({
@@ -1213,26 +1213,26 @@ desc("P5b Integration - Loop Control", () => {
 
         p5b.run();
     });
-    
+
     it("should emit exactly one frame when noLoop called in draw", (done) => {
         let frameCount = 0;
         const p5b = new P5b({
             width: 16, height: 16,
             fps: 30,
             setup: () => { createCanvas(100, 100); },
-            draw: () => { 
+            draw: () => {
                 frameCount++;
                 if (frameCount === 1) {
                     noLoop();
                 }
             }
         });
-        
+
         let framesReceived = 0;
         p5b.on("frame", (buffer) => {
             framesReceived++;
         });
-        
+
         setTimeout(() => {
             expect(framesReceived).toBe(1);  // Only first frame
             p5b.stop();
@@ -1272,7 +1272,7 @@ desc("P5b Integration - Loop Control", () => {
 
         p5b.run();
     });
-    
+
     it("should initially report isLooping as true", (done) => {
         let loopingOnFirstFrame;
         const p5b = new P5b({

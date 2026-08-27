@@ -49,7 +49,7 @@ class P5bZMQ {
 
         this.sock = new this.Request();
         this.sock.connect(zmqDest);
-        
+
         this.p.run();
         return zmqDest;
     }

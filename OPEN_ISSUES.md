@@ -1,5 +1,20 @@
 # Open Issues - p5b.js
 
+## Priority 0 - do this before v2 beta release
+
+**8. Adapter-selection convention is inconsistent across runtime and tests**
+`p5b.js` and the tests decide "is this p5 v1 or v2?" with different rules on the same
+`P5B_P5_PATH` env var, so they can disagree. `p5b.js` uses `P5B_P5_PATH.startsWith("p5-v2")`
+(unknown names default to v1); every test uses `isP5v2 = (P5B_P5_PATH || "p5") !== "p5"`
+(unknown names default to v2). They agree only for the shipped values (`p5` → v1,
+`p5-v2` → v2). Any non-`"p5"`, non-`"p5-v2"*` value (e.g. `p5-next`, `@scope/p5-v2`,
+`p5@2.x`) makes the runtime load the **v1 adapter** while the test harness runs in **v2 mode** —
+silently running the wrong adapter against the wrong p5 version. **Fix:** add a single source
+of truth, e.g. `isP5v2(env)` in `lib/globals.js`, and use it in `p5b.js` and every test.
+Canonical rule: `P5B_P5_PATH && P5B_P5_PATH !== "p5"` → v2 (`_loadP5()` already `require`s
+whatever name is set). **Update Accordingly:** `p5b.js`, `p5b.mjs` (if it branches on version),
+and every `isP5v2` in `test/**`. Verify `test:v1` + `test:v2` pass.
+
 ## Priority 1 — API Gaps & Semantics
 
 ### DOM Functions Behavior Unverified
@@ -70,6 +85,9 @@ DOM-function audit.
 
 **6. p5.js Strands support**
 - Add an example for using p5 strands, only supported in v2.x. This is a new way of writing shader code with JS directly. Reference examples in the p5.js repo.
+
+**7. Add save* support**
+- In headless environments it may desirable to run saveImage(), saveJSON(), etc. 
 
 ---
 

@@ -108,18 +108,18 @@ describe("P5b Real Sketch - Shapes (colored)", () => {
         p5b.on("frame", (buffer) => {
             expect(buffer).toBeInstanceOf(Uint8Array);
             expect(buffer.length).toBe(64 * 64 * 4);
-            
+
             // Verify the buffer contains the expected colors from graphics layers
             // Background: 100, 150, 200
             // Graphics1 (orange): 255, 100, 50
             // Graphics2 (green): 100, 255, 50
             let hasExpectedColors = false;
-            
+
             for (let i = 0; i < buffer.length; i += 4) {
                 const r = buffer[i];
                 const g = buffer[i + 1];
                 const b = buffer[i + 2];
-                
+
                 // Check for background color (approximate due to scaling)
                 if (Math.abs(r - 100) < 50 && Math.abs(g - 150) < 50 && Math.abs(b - 200) < 50) {
                     hasExpectedColors = true;
@@ -132,7 +132,7 @@ describe("P5b Real Sketch - Shapes (colored)", () => {
                     break;
                 }
             }
-            
+
             expect(hasExpectedColors).toBe(true);
             expect(errorOccurred).toBe(false);
             p5b.stop();
@@ -184,7 +184,7 @@ describe("P5b Real Sketch - loadImage", () => {
             // (canvas is 7954x7954, image is 7954x5305, so y > 21 in output is blue)
             const corner = px(31, 31);
             expect(corner).toEqual([0, 0, 255]);
-            
+
             // Check a position definitely in blue region (y >= 22)
             const bottomArea = px(22, 22);
             expect(bottomArea).toEqual([0, 0, 255]);

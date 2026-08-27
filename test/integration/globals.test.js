@@ -1,7 +1,7 @@
 const { describe, it, expect } = require("bun:test");
 const { P5b } = require("../../p5b.js");
 
-// p5 v2 removed string utility functions (join, split, trim) that wrapped native JS
+// p5.js v2 removed string utility functions (join, split, trim) that wrapped native JS
 // equivalents. P5b shims them back to v1 semantics in v2 mode.
 const isP5v2 = (process.env.P5B_P5_PATH || "p5") !== "p5";
 
