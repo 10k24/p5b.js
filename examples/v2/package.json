@@ -1,11 +1,11 @@
 {
     "name": "@10k24/p5b-examples-v2",
-    "version": "1.2.2",
+    "version": "2.0.0-beta",
     "description": "p5b examples for p5.js 2.x",
     "private": true,
     "type": "commonjs",
     "dependencies": {
-        "@10k24/p5b": "1.2.2",
+        "@10k24/p5b": "2.0.0-beta",
         "p5": "^2.0.0"
     },
     "optionalDependencies": {

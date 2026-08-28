@@ -1,5 +1,39 @@
 # Changelog
 
+## [2.0.0-beta]
+
+### Breaking Changes
+
+- `p5` is now a **peer dependency**. If you wish to use multiple versions, install the p5.js version via an npm alias (`"p5-v2": "npm:p5@^2.0.0"`).
+- `P5B_P5_PKG` names the p5.js package to load, defaulting to `p5`. The p5b implementation is auto-selected from the installed p5.js version.
+
+### New Features
+
+- **p5.js v2.x support** — async/await support in `setup()`/`draw()`; v1 still uses sync lifecycle.
+- **Headless WebGL 1** (p5.js v2 via `headless-gl`) — shaders render headlessly. WebGL 2 is unsupported.
+- p5.js v2 headless shims:
+  - `Path2D` polyfill — custom shapes replay through node-canvas.
+  - `colorMode(HSB)` CSS Color 4 string normalization.
+- `loadBytes()`, `loadStrings()` / `loadJSON()` — load from HTTP URLs or local files.
+- config changes:
+    - `maxPoolSize` config — caps pooled `createGraphics` objects by dimension buckets (`0` disables pooling).
+    - `preload` config is **rejected** under v2 (p5.js v2 removed the `preload()` lifecycle).
+
+### Bug Fixes
+
+- `loadXML()` throws a descriptive error as it is not implemented.
+
+### Internal & Refactor
+
+- Sources reorganized under `lib/`.
+- Shared asset-loading helpers; `async`/`await` contained to the v2 p5b implementation.
+- Generated docs + examples build pipeline (`build-docs` + `validate:docs`).
+
+### Examples
+
+- Restructured into `examples/v1`, `examples/v2`, `examples/common`.
+- New sketch examples and a Kitty terminal renderer example.
+
 ## [1.2.2]
 
 ### Bug Fixes
