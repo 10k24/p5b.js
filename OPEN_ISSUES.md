@@ -51,6 +51,20 @@ API absent headless. Categorized gaps:
 - v1: `createCanvas(..., WEBGL)` **throws by design**; `loadShader`/`loadModel` bound but unusable.
 - v2: WebGL 1 works via headless-gl; WebGL 2 unsupported (headless-gl is WebGL-1 only).
 
+### v1 WebGL missing only the frame read-back path (not a hard blocker)
+The DOM shim (`lib/p5b-dom.js` getContext intercept) already serves headless-gl to **any** canvas,
+so p5 v1 **can** create a WebGL context. The reason v1 throws (`lib/p5b_v1.js` `createCanvas`
+wrapper) is that the **frame read-back pipeline exists only in v2**: p5b emits frames by reading
+pixels from a 2D node-canvas, but a WebGL renderer draws into a headless-gl drawingbuffer. v2
+bridges this in `toFrame()` via the `isP3D` detection → `loadPixels()` → `putImageData` into a
+cached temp canvas (`_glReadCanvas`) → letterbox → read-back path (`lib/p5b_v2.js`). v1 has **no**
+such path, so a v1 WebGL sketch would silently render into the GL buffer that `toFrame()` never
+reads → blank frames. The throw is a guard against that silent failure, not an impossibility.
+**Fix (if v1 WebGL is wanted):** port the same P3D read-back path into `lib/p5b_v1.js`'s
+`toFrame()`, remove the `createCanvas` throw, and add v1 shader/geometry fixtures + tests.
+Deliberate scope decision so far — the v2 WebGL effort (WEBGL_TASKS 1-6, shaders, geometry,
+memleak verification) was not replicated for v1.
+
 **4. Known-unsupported by design (browser APIs):** sound, video/capture
 (`createCapture`, `createVideo`).
 

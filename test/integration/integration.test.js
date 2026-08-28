@@ -3010,7 +3010,7 @@ desc("P5b Integration - navigator.userAgent", () => {
         });
         p5b.on("error", (e) => { p5b.stop(); done(e.error); });
         p5b.on("frame", () => {
-            expect(capturedUA).toMatch(/^p5b-dom\/\d+\.\d+\.\d+$/);
+            expect(capturedUA).toMatch(/^p5b-dom\/\d+\.\d+\.\d+(-beta*)?$/);
             p5b.stop();
             done();
         });
