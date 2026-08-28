@@ -1,0 +1,38 @@
+# P5b Examples
+
+Example p5b sketches for p5.js 1.x (`v1/`) and p5.js 2.x (`v2/`).
+
+## Layout
+
+- `v1/` — examples for p5.js 1.x
+- `v2/` — the same examples for p5.js 2.x (async/await, no `preload()`)
+- `common/` — shared utilities used by both example sets
+
+## Setup
+
+Each version directory is self-contained. Install its dependencies and run from that
+directory:
+
+```bash
+cd v1 && bun install   # p5.js 1.x
+cd v2 && bun install   # p5.js 2.x
+```
+
+`zeromq` is an **optional** dependency of each version set — only `ex-p5b-zmq.js` needs it.
+If it wasn't installed, run `npm install --include=optional` in the relevant directory.
+
+## v1 — p5.js 1.x
+
+{{=it.v1.examples}}
+
+Sketches:
+
+{{=it.v1.sketches}}
+
+## v2 — p5.js 2.x
+
+{{=it.v2.examples}}
+
+Sketches:
+
+{{=it.v2.sketches}}

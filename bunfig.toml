@@ -1,2 +1,3 @@
 [test]
-preload = ["./test-preload.js"]
+preload = ["./scripts/testrunner.js"]
+coverageReporter = ["text", "lcov"]

@@ -1,4 +1,7 @@
 const js = require("@eslint/js");
+const { mathFunctions, p5Constants } = require("./lib/globals");
+
+const p5StaticGlobals = Object.keys({ ...mathFunctions, ...p5Constants });
 
 module.exports = [
     {
@@ -14,9 +17,12 @@ module.exports = [
                 setImmediate: "readonly",
                 clearImmediate: "readonly",
                 Buffer: "readonly",
+                Blob: "readonly",
+                Request: "readonly",
                 setInterval: "readonly",
                 clearInterval: "readonly",
                 setTimeout: "readonly",
+                clearTimeout: "readonly",
                 createCanvas: "readonly",
                 background: "readonly",
                 createGraphics: "readonly",
@@ -34,7 +40,8 @@ module.exports = [
             "no-unused-vars": ["error", { argsIgnorePattern: "^_", caughtErrorsIgnorePattern: "^_" }],
             "no-console": ["warn"],
             "eol-last": ["error", "always"],
-            "no-multiple-empty-lines": ["error", { "max": 1, "maxEOF": 0 }]
+            "no-multiple-empty-lines": ["error", { "max": 1, "maxEOF": 0 }],
+            "no-trailing-spaces": ["error"]
         }
     },
     {
@@ -75,11 +82,37 @@ module.exports = [
                 accelerationY: "readonly",
                 accelerationZ: "readonly",
                 loadImage: "readonly",
+                loadBytes: "readonly",
                 noLoop: "readonly",
-                path: "readonly"
+                path: "readonly",
+                // Static constants + Math pass-throughs (single source: globals.js)
+                ...Object.fromEntries(p5StaticGlobals.map((name) => [name, "readonly"])),
+                // p5.js instance functions (bound from the p5.js instance, not statically)
+                sin: "readonly", cos: "readonly", tan: "readonly",
+                asin: "readonly", acos: "readonly", atan: "readonly",
+                atan2: "readonly", sq: "readonly", mag: "readonly",
+                fract: "readonly", angleMode: "readonly", radians: "readonly",
+                degrees: "readonly",
+                // Random / noise functions
+                random: "readonly", randomSeed: "readonly",
+                randomGaussian: "readonly", noise: "readonly",
+                noiseSeed: "readonly", noiseDetail: "readonly",
+                // Utility functions
+                map: "readonly", lerp: "readonly", constrain: "readonly",
+                dist: "readonly", norm: "readonly", lerpColor: "readonly",
+                createVector: "readonly",
+                // String formatting functions
+                nf: "readonly", nfc: "readonly", nfp: "readonly", nfs: "readonly",
+                join: "readonly", split: "readonly", splitTokens: "readonly",
+                trim: "readonly",
+                // Fixture-exposed test data (set by test/fixtures/sketches)
+                results: "readonly", found_hello: "readonly",
+                found_count: "readonly", window_width_at_top_level: "readonly",
+                window_height_at_top_level: "readonly", canvas_width: "readonly"
             }
         },
         rules: {
+            "no-undef": "off",
             "no-unused-vars": "off"
         }
     },
@@ -124,6 +157,7 @@ module.exports = [
             }
         },
         rules: {
+            "no-undef": "off",
             "no-unused-vars": "off"
         }
     },
@@ -132,7 +166,8 @@ module.exports = [
         rules: {
             "no-console": "off",
             "no-undef": "off",
-            "no-unused-vars": "off"
+            "no-unused-vars": "off",
+            "no-global-assign": "off"
         }
     }
 ];

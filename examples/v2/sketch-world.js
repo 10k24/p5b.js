@@ -1,0 +1,43 @@
+// WebGL shader globe
+
+let globeShader;
+
+function setup() {
+    createCanvas(32, 32, WEBGL);
+    noStroke();
+
+    globeShader = baseMaterialShader().modify(() => {
+        const freq      = uniformFloat("freq",      3.0);
+        const threshold = uniformFloat("threshold", 0.50);
+        const time      = uniformFloat(() => millis() * 0.00008);
+
+        // Fragment: colour ocean vs land using UV coords to drive noise
+        getPixelInputs((inputs) => {
+            let uv = inputs.texCoord;
+            uv.x += time; // scroll left to right
+
+            let nv = noise(uv.x * freq,           uv.y * freq)
+           + 0.45 * noise(uv.x * freq * 2.1, uv.y * freq * 2.1)
+           + 0.20 * noise(uv.x * freq * 4.3, uv.y * freq * 4.3);
+            nv = nv / 1.65;
+
+            if (nv > threshold) {
+                let t = (nv - threshold) / (1.0 - threshold);
+                inputs.color = mix([0.12, 0.55, 0.12, 1.0], [0.20, 0.72, 0.18, 1.0], t);
+            } else {
+                inputs.color = [0.06, 0.34, 0.72, 1.0];
+            }
+
+            return inputs;
+        });
+    });
+}
+
+function draw() {
+    background(15, 20, 35);
+
+    noLights();
+
+    shader(globeShader);
+    plane(width, height);
+}

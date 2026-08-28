@@ -29,11 +29,21 @@
         "headless"
     ],
     "scripts": {
-        "test": "bun test",
+        "test": "bun run validate:docs && bun test",
+        "test:v1": "P5B_P5_PKG=p5 bun test",
+        "test:v2": "P5B_P5_PKG=p5-v2 bun test",
+        "test:all": "bun run test:v1 && bun run test:v2 && bun run test:webgl && bun run validate:docs",
+        "test:coverage": "P5B_P5_PKG=p5 bun test --coverage && P5B_P5_PKG=p5-v2 bun test --coverage",
+        "test:webgl": "P5B_P5_PKG=p5-v2 node --test --test-force-exit test/webgl.node.js test/webgl-shaders.node.js",
+        "coverage:html": "node scripts/coverage-report.js",
+        "postinstall": "node scripts/patch-gifenc.js",
         "test:watch": "bun test --watch",
         "lint": "bunx eslint",
+        "drift": "node scripts/compare-adapters.js",
         "fix": "bunx eslint --fix",
-        "docs": "node scripts/build-readme.js"
+        "docs": "node scripts/build-docs.js",
+        "validate:docs": "node scripts/validate-docs.js",
+        "act": "sh scripts/act.sh"
     },
     "license": "LGPL-2.1-only",
     "engines": {
@@ -42,18 +52,34 @@
     "type": "commonjs",
     "files": [
         "p5b.js",
-        "p5b-dom.js",
         "p5b.mjs",
+        "lib/globals.js",
+        "lib/p5b-base.js",
+        "lib/p5b_v1.js",
+        "lib/p5b_v2.js",
+        "lib/p5b-dom.js",
         "README.md",
         "LICENSE"
     ],
+    "peerDependencies": {
+        "p5": "^1.6.0 || ^2.0.0"
+    },
+    "peerDependenciesMeta": {
+        "p5": {
+            "optional": false
+        }
+    },
     "dependencies": {
         "canvas": "^3.2.3",
-        "opentype.js": "^1.3.4",
-        "p5": "^1.11.12"
+        "opentype.js": "^1.3.4"
+    },
+    "optionalDependencies": {
+        "gl": "^8.1.6"
     },
     "devDependencies": {
         "dot": "^1.1.3",
-        "eslint": "^9.39.0"
+        "eslint": "^9.39.0",
+        "p5": "^1.11.12",
+        "p5-v2": "npm:p5@^2.0.0"
     }
 }

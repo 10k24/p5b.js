@@ -1,0 +1,20 @@
+// Generative noise()/random() field
+
+function setup() {
+    createCanvas(200, 200);
+    noStroke();
+}
+
+function draw() {
+    background(15);
+
+    const t = frameCount * 0.02;
+    for (let y = 0; y < height; y += 10) {
+        for (let x = 0; x < width; x += 10) {
+            const n = noise(x * 0.05, y * 0.05, t);
+            const b = map(n, 0, 1, 20, 255);
+            fill(60, 120, b);
+            rect(x, y, 10, 10);
+        }
+    }
+}
