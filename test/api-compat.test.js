@@ -2,8 +2,9 @@ const { describe, it, expect } = require("bun:test");
 const { P5b } = require("../p5b.js");
 const fs = require("fs");
 const path = require("path");
+const { findP5Version } = require("../lib/globals");
 
-const isP5v2 = (process.env.P5B_P5_PATH || "p5") !== "p5";
+const isP5v2 = findP5Version() === 2;
 
 describe("API Compatibility: loadJSON", () => {
     it.skipIf(isP5v2)("should load local JSON file", (done) => {

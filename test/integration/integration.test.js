@@ -1,8 +1,9 @@
 const { describe: desc, it, expect } = require("bun:test");
 const path = require("path");
+const { findP5Version } = require("../../lib/globals");
 
 // Detect p5.js version for skipping v2-incompatible tests
-const isP5v2 = (process.env.P5B_P5_PATH || "p5") !== "p5";
+const isP5v2 = findP5Version() === 2;
 const { P5b } = require("../../p5b");
 
 // TODO: build out more utils like this for brevity

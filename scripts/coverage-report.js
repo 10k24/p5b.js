@@ -25,7 +25,7 @@ function collect() {
     for (const { env, file } of ADAPTERS) {
         const res = spawnSync("bun", ["test", "--coverage"], {
             cwd: ROOT,
-            env: { ...process.env, P5B_P5_PATH: env },
+            env: { ...process.env, P5B_P5_PKG: env },
             stdio: "inherit",
         });
         if (res.status !== 0) {

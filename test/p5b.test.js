@@ -2,8 +2,9 @@ const { describe, it, expect } = require("bun:test");
 const path = require("path");
 const { P5b, P5B_DEFAULTS } = require("../p5b.js");
 const { P5bBase } = require("../lib/p5b-base");
+const { findP5Version } = require("../lib/globals");
 
-const isP5v2 = (process.env.P5B_P5_PATH || "p5") !== "p5";
+const isP5v2 = findP5Version() === 2;
 
 describe("P5b Exports", () => {
     it("should export P5b class", () => {

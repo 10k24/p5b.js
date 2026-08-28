@@ -11,6 +11,7 @@
 const { describe, it } = require("bun:test");
 const path = require("path");
 const { P5b } = require("../../p5b.js");
+const { findP5Version } = require("../lib/globals");
 
 let glAvailable = true;
 let glError = null;
@@ -21,7 +22,7 @@ try {
     glError = e.message;
 }
 
-const isP5v2 = (process.env.P5B_P5_PATH || "p5") !== "p5";
+const isP5v2 = findP5Version() === 2;
 
 describe("WebGL / headless-gl", () => {
     if (!glAvailable) {

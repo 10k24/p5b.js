@@ -2,8 +2,9 @@
 const { describe, it, expect } = require("bun:test");
 const path = require("path");
 const { P5b } = require("../../p5b");
+const { findP5Version } = require("../../lib/globals");
 
-const isP5v2 = (process.env.P5B_P5_PATH || "p5") !== "p5";
+const isP5v2 = findP5Version() === 2;
 
 const sketchesDir = path.join(process.cwd(), "test/fixtures/sketches");
 

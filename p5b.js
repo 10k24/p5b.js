@@ -1,9 +1,4 @@
-const p5pkg = process.env.P5B_P5_PATH || "p5";
+const { findP5Version } = require("./lib/globals");
 
-// Adapter selection mirrors the P5B_P5_PATH convention used by each wrapper's
-// _loadP5(): "p5" targets p5.js v1, "p5-v2*" targets p5.js v2 (any variant).
-const { P5b, P5B_DEFAULTS } = p5pkg.startsWith("p5-v2")
-    ? require("./lib/p5b_v2")
-    : require("./lib/p5b_v1");
-
-module.exports = { P5b, P5B_DEFAULTS };
+// Select the adapter from the *installed* p5 package version (see findP5Version).
+module.exports = require(`./lib/p5b_v${findP5Version()}`);

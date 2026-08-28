@@ -2,19 +2,6 @@
 
 ## Priority 0 - do this before v2 beta release
 
-**8. Adapter-selection convention is inconsistent across runtime and tests**
-`p5b.js` and the tests decide "is this p5 v1 or v2?" with different rules on the same
-`P5B_P5_PATH` env var, so they can disagree. `p5b.js` uses `P5B_P5_PATH.startsWith("p5-v2")`
-(unknown names default to v1); every test uses `isP5v2 = (P5B_P5_PATH || "p5") !== "p5"`
-(unknown names default to v2). They agree only for the shipped values (`p5` → v1,
-`p5-v2` → v2). Any non-`"p5"`, non-`"p5-v2"*` value (e.g. `p5-next`, `@scope/p5-v2`,
-`p5@2.x`) makes the runtime load the **v1 adapter** while the test harness runs in **v2 mode** —
-silently running the wrong adapter against the wrong p5 version. **Fix:** add a single source
-of truth, e.g. `isP5v2(env)` in `lib/globals.js`, and use it in `p5b.js` and every test.
-Canonical rule: `P5B_P5_PATH && P5B_P5_PATH !== "p5"` → v2 (`_loadP5()` already `require`s
-whatever name is set). **Update Accordingly:** `p5b.js`, `p5b.mjs` (if it branches on version),
-and every `isP5v2` in `test/**`. Verify `test:v1` + `test:v2` pass.
-
 ## Priority 1 — API Gaps & Semantics
 
 ### DOM Functions Behavior Unverified
@@ -195,7 +182,7 @@ Require browser APIs unavailable in Node.js.
   (NODE_MODULE_VERSION 127); bun requires 137, so it cannot load under bun — WebGL requires
   plain `node`. The `bun test` suite can't exercise it; `test/webgl.test.js` gates WebGL tests
   on gl availability (run under node, skip under bun). Diagnostic tooling: `scripts/gl-diag.js`
-  (`P5B_P5_PATH=p5-v2 node --expose-gc scripts/gl-diag.js [sketch] [frames] [every] [outW] [outH]`).
+  (`P5B_P5_PKG=p5-v2 node --expose-gc scripts/gl-diag.js [sketch] [frames] [every] [outW] [outH]`).
 - **`loadBytes()` (v1 + v2)** — implemented via the shared `request(url, "arrayBuffer")`
   helper (new `arrayBuffer` response type). v1 mirrors native p5 v1 (returns `{}` shell with
   `.bytes` as `Uint8Array`, preload-counter-gated); v2 mirrors native p5 v2 (Promise resolving
@@ -246,3 +233,12 @@ Require browser APIs unavailable in Node.js.
   limitations, async `setup()` note.
 - **Coverage HTML report** — `coverage:html` script (`scripts/coverage-report.js`) runs both
   suites, merges lcov, renders `coverage/html/index.html`; `coverage/` is gitignored.
+- **p5 version detection via installed package (`findP5Version`)** — `lib/globals.js` exports
+  `findP5Version()` (leaf module: `require.resolve` + package.json walk-up; returns installed p5
+  major 1/2, throws on unsupported). `p5b.js` selects `lib/p5b_v<major>` via it; each test derives
+  `isP5v2 = findP5Version() === 2`, so runtime and tests share the same detection. Env var renamed
+  `P5B_P5_PKG` (was `P5B_P5_PATH`), now only names which package to load — fixes the
+  `"p5": "2.x"`-installed, no-env-override case. Consumers updated: `lib/p5b-base.js` `_loadP5()`,
+  `package.json` test scripts, `scripts/coverage-report.js`, 7 test files, `templates/README.dot` +
+  regenerated `README.md`. Resolves former Priority 0 item 0. Verified `test:v1` (237 pass),
+  `test:v2` (223 pass), lint clean.

@@ -90,10 +90,17 @@ p5b.run();</code></pre></td></tr>
 
 ## p5.js Version Selection
 
-By default p5b loads whichever `p5` package is installed. Set `P5B_P5_PATH` to use a different package name:
+By default p5b loads whichever `p5` package is installed and auto-selects the adapter from its installed version. Set `P5B_P5_PKG` to use a different package name in your `package.json`, for example:
+
+```
+"p5": "^1.11.12",
+"p5-v2": "npm:p5@^2.0.0"
+```
+
+To use `p5-v2`, invoke your code as follows.
 
 ```bash
-P5B_P5_PATH=p5-v2 node my-sketch.js
+P5B_P5_PKG=p5-v2 node my-sketch.js
 ```
 
 **p5.js v2 async setup:** p5 v2 removed the `preload()` lifecycle. p5b **rejects** a `preload` config under v2 (the `preload` option is v1-only) — for v2 sketches, use `async setup()` directly:

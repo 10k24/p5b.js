@@ -1,9 +1,10 @@
 const { describe, it, expect } = require("bun:test");
 const { P5b } = require("../../p5b.js");
+const { findP5Version } = require("../../lib/globals");
 
 // p5.js v2 removed string utility functions (join, split, trim) that wrapped native JS
 // equivalents. P5b shims them back to v1 semantics in v2 mode.
-const isP5v2 = (process.env.P5B_P5_PATH || "p5") !== "p5";
+const isP5v2 = findP5Version() === 2;
 
 describe("P5b Globals - p5.js v1.x Compatibility", () => {
     describe("Trigonometry Constants", () => {
