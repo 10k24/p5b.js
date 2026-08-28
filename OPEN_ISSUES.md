@@ -95,7 +95,7 @@ an inline `setup()` calling `loadXML()`. Full support is blocked on a browser-on
 `DOMParser` global, which Node doesn't provide. Faithful support needs a `DOMParser` shim or
 third-party XML→DOM parser, plus the `p5.XML` wrapper API (children/attributes traversal).
 Same class of browser-API gap as sound/video. Would also conflict with p5b's minimal-dependency
-philosophy.
+philosophy. Perhaps this is simply adding a dependency on jsdom
 
 ### Canvas Rendering Optimization
 Render headless CPU-only 2D (1 sketch at a time, no GPU). Current stack: `node-canvas`
